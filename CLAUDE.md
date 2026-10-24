@@ -6,6 +6,7 @@ This repo is public: never commit secrets. Push protection and a pre-tool hook e
 ## How work flows
 - Skills are chosen by their descriptions; the catalog with triggers is in `docs/agents/harness.md`. Before any planning skill, read `docs/adr/README.md`. Skills that create issues, branches or PRs are hidden from Claude and typed by the operator.
 - A rule that must hold every time is a hook, never a sentence here.
+- Start each new change on its own branch off `origin/main`, without asking. When the change is done, push it, open the PR yourself and tell the operator; the merge stays theirs (ADR 0013).
 - Downloaded skills (listed in skills-lock.json) are never edited; wrap them in an `hl-` skill instead.
 
 ## Repo facts
