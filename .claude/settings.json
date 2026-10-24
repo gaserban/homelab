@@ -27,7 +27,8 @@
   "skillOverrides": {
     "prototype": "user-invocable-only",
     "find-skills": "user-invocable-only",
-    "ask-matt": "off"
+    "ask-matt": "off",
+    "plugin-authoring": "off"
   },
   "hooks": {
     "PreToolUse": [
