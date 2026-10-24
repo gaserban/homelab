@@ -31,11 +31,15 @@
     "plugin-authoring": "off"
   },
   "hooks": {
+    "SessionStart": [
+      { "hooks": [{ "type": "command", "command": "bash .claude/hooks/token-refresh.sh" }] }
+    ],
     "PreToolUse": [
       {
         "matcher": "Bash",
         "hooks": [
           { "type": "command", "command": "bash .claude/hooks/git-guard.sh" },
+          { "type": "command", "command": "bash .claude/hooks/token-refresh.sh" },
           { "type": "command", "if": "Bash(gh issue *)", "command": "bash .claude/hooks/issue-template.sh" }
         ]
       }

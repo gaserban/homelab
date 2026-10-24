@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# Regression tests for the PreToolUse hooks. Run from anywhere: bash .claude/hooks/test.sh
-# Each case feeds a PreToolUse JSON payload to a hook and checks the exit code
-# (2 = blocked, 0 = allowed). Exits 1 if any case mismatches.
+# Regression tests for the hooks. Run from anywhere: bash .claude/hooks/test.sh
+# Guard cases feed a PreToolUse JSON payload to a hook and check the exit code (2 = blocked,
+# 0 = allowed); token-refresh cases check whether the hook called a stub helper.
+# Exits 1 if any case mismatches.
 set -u
 cd "$(dirname "$0")/../.." || exit 1
 tmp="${TMPDIR:-/tmp}"; fail=0
@@ -82,6 +83,35 @@ t $I 2 'create in \$( )'             "url=\$($C --title t)"
 t $I 2 'create on second line'       $'cd /tmp\n'"$C --title t"
 t $I 0 'commit msg mentions edit'    "git commit -F - <<'EOF'"$'\n'"fix: $E demanded a body"$'\n'"EOF"
 t $I 0 'echo mentions create'        "echo 'use $C with a body file'"
+
+echo "# token-refresh: calls gh-app-token only when the cache is stale and the command needs it"
+rt="$tmp/hooktest-runtime"; stub="$tmp/hooktest-stub"; calls="$tmp/hooktest-calls"
+mkdir -p "$rt"; printf '#!/bin/sh\necho x >> "%s"\n' "$calls" > "$stub"; chmod +x "$stub"
+r() { # r <want: call|none> <cache: fresh|stale|missing> <label> <payload>
+  local want=$1 cache=$2 label=$3 payload=$4 got=none
+  rm -f "$calls" "$rt/homelab-app-token"
+  case $cache in
+    fresh) printf tok > "$rt/homelab-app-token" ;;
+    stale) printf tok > "$rt/homelab-app-token"; touch -d '-51 minutes' "$rt/homelab-app-token" ;;
+  esac
+  printf '%s' "$payload" | XDG_RUNTIME_DIR="$rt" HOMELAB_APP_TOKEN_HELPER="$stub" bash .claude/hooks/token-refresh.sh >/dev/null 2>&1
+  [ -s "$calls" ] && got=call
+  if [ "$got" = "$want" ]; then printf 'ok    %-7s %-5s %s\n' token "$want" "$label"
+  else fail=1; printf 'FAIL  %-7s want=%s got=%s %s\n' token "$want" "$got" "$label"; fi
+}
+b() { jq -cn --arg c "$1" '{hook_event_name:"PreToolUse",tool_name:"Bash",tool_input:{command:$c}}'; }
+S='{"hook_event_name":"SessionStart","source":"startup"}'
+r none  fresh   'session start, fresh'       "$S"
+r call  stale   'session start, stale'       "$S"
+r call  missing 'session start, no cache'    "$S"
+r none  fresh   'gh, fresh'                  "$(b 'gh pr list')"
+r call  stale   'gh, stale'                  "$(b 'gh pr list')"
+r call  stale   'git push, stale'            "$(b 'git push -u origin feat')"
+r call  stale   'push after &&, stale'       "$(b 'git commit -m x && git push')"
+r call  stale   '/usr/bin/gh, stale'         "$(b '/usr/bin/gh issue view 3')"
+r none  stale   'ls, stale'                  "$(b 'ls -la')"
+r none  stale   'git status, stale'          "$(b 'git status')"
+r none  stale   'ghcr.io mention, stale'     "$(b 'curl https://ghcr.io/v2/')"
 
 echo "# malformed input"
 t $G 0 'no command key'              ''

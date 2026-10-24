@@ -34,13 +34,19 @@ Claude Desktop WSL session. Decisions behind each step: ADR 0001, 0005, 0013, 00
 2. Install the Proton Pass CLI (`pass-cli`) and log in once. Create the vault entries the bootstrap
    adapter will read; names are listed in `docs/adr/0008-secrets.md` once the first environment
    exists.
-3. Put the App key at `~/.config/homelab/app.pem`, `chmod 600`. In `~/.local/bin`, add a git
-   credential helper and a `gh` wrapper that mint one-hour App installation tokens from the key
-   (a small script using openssl and curl). Set the App's bot name and email with
-   `git config --global`, and set the helper. `~/.local/bin` must be on `PATH` before the helper
-   scripts work: Debian's `~/.profile` adds it only when the directory already exists at login, so
-   create the directory, log in again, and check that `command -v gh` resolves to the wrapper and
-   not to `/usr/bin/gh`.
+3. Put the App key at `~/.config/homelab/app.pem`, `chmod 600`, and the App's IDs in
+   `~/.config/homelab/env` (`HOMELAB_APP_ID=...`, `HOMELAB_APP_INSTALLATION_ID=...`). The helper
+   scripts live in the repository's `tools/` (step 5 clones it); symlink them into `~/.local/bin`:
+   `ln -s ~/src/homelab/tools/{gh-app-token,gh,git-credential-homelab-app} ~/.local/bin/`.
+   `gh-app-token` serves a cached one-hour App installation token from
+   `$XDG_RUNTIME_DIR/homelab-app-token` and mints a new one from the key only when the cache is
+   older than 50 minutes; the sandbox cannot read the key, so the `token-refresh.sh` hook (which
+   runs outside it) keeps the cache fresh. Set the App's bot name and email with
+   `git config --global`, and set the helper:
+   `git config --global credential.https://github.com.helper '!git-credential-homelab-app'`.
+   `~/.local/bin` must be on `PATH` before the helper scripts work: Debian's `~/.profile` adds it
+   only when the directory already exists at login, so create the directory, log in again, and
+   check that `command -v gh` resolves to the wrapper and not to `/usr/bin/gh`.
 4. Install the container runtime per ADR 0005, rung by rung, until kind creates a cluster. Record
    the winning rung in the Podman prototype ticket.
 5. `git clone https://github.com/gaserban/homelab ~/src/homelab`.
@@ -61,8 +67,9 @@ Claude Desktop WSL session. Decisions behind each step: ADR 0001, 0005, 0013, 00
 
 ## Known risks
 
-- Claude can read the App key, because the credential helper runs inside the sandbox. With it,
-  Claude can push branches and open PRs on this repository. It cannot merge (ruleset). Rotate the
-  key on suspicion.
+- Claude cannot read the App key: the sandbox and the Read tool are denied `~/.config/homelab`, and
+  the key is read only by the `token-refresh.sh` hook, outside the sandbox. Claude can read the
+  cached one-hour App token, and with it push branches and open PRs on this repository until it
+  expires. It cannot merge (ruleset). Rotate the key on suspicion.
 - WebFetch runs outside the sandbox; permission prompts decide which sites it reaches.
 - Excluding the container runtime from the sandbox gives that one command host access.
