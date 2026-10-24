@@ -13,3 +13,17 @@ This repo is public: never commit secrets. Push protection and a pre-tool hook e
 - Stateful Kustomizations carry `deletionPolicy: Orphan` and stateful objects carry the no-prune annotation.
 - Images must be multi-architecture (amd64 + arm64).
 - Decisions live in `docs/adr/`; read the index before proposing a change to any of them.
+
+## Agent skills
+
+### Issue tracker
+
+GitHub Issues, every body mapped onto the four-heading template. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+The five default roles, label string equal to role name. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: `GLOSSARY.md` and `docs/adr/` at the repo root. See `docs/agents/domain.md`.
