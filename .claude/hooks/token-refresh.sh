@@ -7,18 +7,18 @@
 # PreToolUse refreshes only for commands that need the token: `gh` or `git ... push`.
 # HOMELAB_APP_TOKEN_HELPER overrides the helper (used by test.sh).
 set -u
-helper="${HOMELAB_APP_TOKEN_HELPER:-tools/gh-app-token}"
+helper="${HOMELAB_APP_TOKEN_HELPER:-${CLAUDE_PROJECT_DIR:-.}/tools/gh-app-token}"
 runtime="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"; [ -d "$runtime" ] || runtime=/tmp
 cache="$runtime/homelab-app-token"
-max_age=3000 # 50 minutes; tokens live 60
+max_age=3000 # 50 minutes; the helper serves the cache up to 55, tokens live 60
 
 input="$(cat)"
-if printf '%s' "$input" | grep -q '"hook_event_name" *: *"PreToolUse"'; then
-  command -v jq >/dev/null 2>&1 || exit 0
+# Without jq the command cannot be inspected, so every Bash call gets the stale-cache check.
+if printf '%s' "$input" | grep -q '"hook_event_name" *: *"PreToolUse"' && command -v jq >/dev/null 2>&1; then
   cmd="$(printf '%s' "$input" | jq -r '.tool_input.command // empty' 2>/dev/null)"
   printf '%s' "$cmd" | grep -qE '(^|[^[:alnum:]_.-])gh([^[:alnum:]_.-]|$)|(^|[^[:alnum:]_.-])git[[:space:]]([^;&|]*[[:space:]])?push([[:space:];&|)]|$)' \
     || exit 0
 fi
 
 if [ -f "$cache" ] && [ $(( $(date +%s) - $(stat -c %Y "$cache") )) -lt "$max_age" ]; then exit 0; fi
-"$helper" >/dev/null || { echo "token-refresh.sh: $helper failed; gh and git push will fail in the sandbox" >&2; exit 1; }
+"$helper" --refresh >/dev/null || { echo "token-refresh.sh: $helper failed; gh and git push will fail in the sandbox" >&2; exit 1; }

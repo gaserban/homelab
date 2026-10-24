@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# Regression tests for the PreToolUse hooks. Run from anywhere: bash .claude/hooks/test.sh
-# Each case feeds a PreToolUse JSON payload to a hook and checks the exit code
-# (2 = blocked, 0 = allowed). Exits 1 if any case mismatches.
+# Regression tests for the hooks. Run from anywhere: bash .claude/hooks/test.sh
+# Guard cases feed a PreToolUse JSON payload to a hook and check the exit code (2 = blocked,
+# 0 = allowed); token-refresh cases check whether the hook called a stub helper.
+# Exits 1 if any case mismatches.
 set -u
 cd "$(dirname "$0")/../.." || exit 1
 tmp="${TMPDIR:-/tmp}"; fail=0

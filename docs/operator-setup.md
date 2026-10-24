@@ -43,10 +43,10 @@ Claude Desktop WSL session. Decisions behind each step: ADR 0001, 0005, 0013, 00
    older than 50 minutes; the sandbox cannot read the key, so the `token-refresh.sh` hook (which
    runs outside it) keeps the cache fresh. Set the App's bot name and email with
    `git config --global`, and set the helper:
-   `git config --global credential.https://github.com.helper '!git-credential-homelab-app'`. `~/.local/bin`
-   must be on `PATH` before the helper scripts work: Debian's `~/.profile` adds it only when the
-   directory already exists at login, so create the directory, log in again, and check that
-   `command -v gh` resolves to the wrapper and not to `/usr/bin/gh`.
+   `git config --global credential.https://github.com.helper '!git-credential-homelab-app'`.
+   `~/.local/bin` must be on `PATH` before the helper scripts work: Debian's `~/.profile` adds it
+   only when the directory already exists at login, so create the directory, log in again, and
+   check that `command -v gh` resolves to the wrapper and not to `/usr/bin/gh`.
 4. Install the container runtime per ADR 0005, rung by rung, until kind creates a cluster. Record
    the winning rung in the Podman prototype ticket.
 5. `git clone https://github.com/gaserban/homelab ~/src/homelab`.

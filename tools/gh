@@ -1,3 +1,4 @@
 #!/usr/bin/env bash
 # gh as the homelab GitHub App. Symlinked into ~/.local/bin, ahead of /usr/bin/gh on PATH.
-GH_TOKEN="$(gh-app-token)" exec /usr/bin/gh "$@"
+token="$(gh-app-token)" || exit 1
+GH_TOKEN="$token" exec /usr/bin/gh "$@"

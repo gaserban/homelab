@@ -1,16 +1,20 @@
 #!/usr/bin/env bash
-# Prints a one-hour installation token for the homelab GitHub App (docs/operator-setup.md, section 3).
+# Prints a one-hour installation token for the homelab GitHub App (docs/operator-setup.md, section 3, step 3).
 # Cache-first: a token younger than 50 minutes is served without touching the key, which is how
 # sandboxed commands get one (the sandbox cannot read ~/.config/homelab). Minting needs the key and
 # so runs outside the sandbox: .claude/hooks/token-refresh.sh, or the operator's own shell.
+#
+# Tokens live 60 minutes. A cached one is served up to 55; `--refresh` (the hook) mints once it is
+# 50 old, so a command that starts just after the hook skipped a refresh still gets a valid token.
 set -euo pipefail
 conf="$HOME/.config/homelab"
 key="$conf/app.pem"
 runtime="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"; [ -d "$runtime" ] || runtime=/tmp
 cache="$runtime/homelab-app-token"
-if [ -f "$cache" ] && [ $(( $(date +%s) - $(stat -c %Y "$cache") )) -lt 3000 ]; then cat "$cache"; exit 0; fi
+max_age=3300; [ "${1:-}" = --refresh ] && max_age=3000
+if [ -f "$cache" ] && [ $(( $(date +%s) - $(stat -c %Y "$cache") )) -lt "$max_age" ]; then cat "$cache"; exit 0; fi
 if ! [ -r "$conf/env" ] || ! [ -r "$key" ]; then
-  echo "gh-app-token: $cache is missing or older than 50 minutes, and the App key is not readable here" \
+  echo "gh-app-token: $cache is missing or older than 55 minutes, and the App key is not readable here" \
     "(the sandbox denies $conf). Mint outside the sandbox: run gh-app-token in a plain WSL shell," \
     "or let .claude/hooks/token-refresh.sh do it by running a gh command from Claude." >&2
   exit 1
@@ -25,4 +29,5 @@ token=$(curl -fsS -X POST -H "Authorization: Bearer $header.$payload.$sig" -H "A
   "https://api.github.com/app/installations/$HOMELAB_APP_INSTALLATION_ID/access_tokens" \
   | sed -n 's/.*"token": *"\([^"]*\)".*/\1/p')
 [ -n "$token" ] || { echo "gh-app-token: no token in response" >&2; exit 1; }
-umask 077; printf '%s' "$token" > "$cache.tmp"; mv "$cache.tmp" "$cache"; printf '%s' "$token"
+umask 077; tmp=$(mktemp "$cache.XXXXXX"); printf '%s' "$token" > "$tmp"; mv -f "$tmp" "$cache"
+printf '%s' "$token"
