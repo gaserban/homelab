@@ -113,6 +113,46 @@ r none  stale   'ls, stale'                  "$(b 'ls -la')"
 r none  stale   'git status, stale'          "$(b 'git status')"
 r none  stale   'ghcr.io mention, stale'     "$(b 'curl https://ghcr.io/v2/')"
 
+echo "# flow-review-bound: at most max_rounds hl-plan-reviewer launches per lens in the running run"
+proj="$tmp/hooktest-proj"; F=flow-review-bound.sh
+a() { # a <want rc> <label> <subagent_type> <prompt>
+  local want=$1 label=$2 payload rc
+  payload=$(jq -cn --arg t "$3" --arg p "$4" '{hook_event_name:"PreToolUse",tool_name:"Agent",tool_input:{subagent_type:$t,prompt:$p}}')
+  printf '%s' "$payload" | CLAUDE_PROJECT_DIR="$proj" bash ".claude/hooks/$F" >/dev/null 2>"$tmp/hooktest.err"; rc=$?
+  if [ "$rc" = "$want" ]; then printf 'ok    %-5s %-7s %s\n' "$F" "rc=$rc" "$label"
+  else fail=1; printf 'FAIL  %-5s want=%s got=%s %s\n      %s\n' "$F" "$want" "$rc" "$label" "$(head -1 "$tmp/hooktest.err")"; fi
+}
+run() { printf '{"issue":%s,"stage":"plan","status":"%s","max_rounds":%s}\n' "$1" "$2" "$3" > "$proj/.flow/$1.json"; }
+R=hl-plan-reviewer
+rm -rf "$proj"; mkdir -p "$proj"
+a 0 'no .flow dir: reviewer passes'     $R $'Lens: Falsifier\nbrief'
+mkdir -p "$proj/.flow"; run 7 done 3
+a 0 'no running run: reviewer passes'   $R $'Lens: Falsifier\nbrief'
+run 7 running 2
+a 0 'other agent type passes'           Explore 'find things'
+a 2 'reviewer without a lens line'      $R 'review this brief'
+a 2 'reviewer with an unknown lens'     $R $'Lens: Optimist\nbrief'
+a 0 'Falsifier round 1'                 $R $'Lens: Falsifier\nbrief'
+a 0 'Saboteur round 1'                  $R $'Lens: Saboteur\nbrief'
+a 0 'Falsifier round 2'                 $R $'Lens: Falsifier\nbrief'
+a 2 'Falsifier round 3 past max 2'      $R $'Lens: Falsifier\nbrief'
+a 0 'Newcomer round 1 still allowed'    $R $'Lens: Newcomer\nbrief'
+[ "$(jq -c .review "$proj/.flow/7.json")" = '{"Falsifier":2,"Saboteur":1,"Newcomer":1}' ] \
+  && echo "ok    $F counts  {Falsifier:2,Saboteur:1,Newcomer:1}" \
+  || { fail=1; echo "FAIL  $F counts $(jq -c .review "$proj/.flow/7.json")"; }
+run 8 running 3
+a 2 'two running runs: ambiguous'       $R $'Lens: Saboteur\nbrief'
+rm -f "$proj/.flow/8.json"
+jq '.max_rounds = 3' "$proj/.flow/7.json" > "$tmp/hooktest-run.json" && mv "$tmp/hooktest-run.json" "$proj/.flow/7.json"
+a 0 'max_rounds raised to 3: round 3'   $R $'Lens: Falsifier\nbrief'
+a 2 'round 4 past max 3'                $R $'Lens: Falsifier\nbrief'
+run 7 running 3; p=$(jq -cn '{tool_name:"Agent",tool_input:{subagent_type:"hl-plan-reviewer",prompt:"Lens: Saboteur\nbrief"}}')
+for i in 1 2 3 4 5 6; do (printf '%s' "$p" | CLAUDE_PROJECT_DIR="$proj" bash ".claude/hooks/$F" 2>/dev/null; echo $? > "$tmp/hooktest-par.$i") & done; wait
+allowed=$(cat "$tmp"/hooktest-par.* | grep -c '^0$'); rm -f "$tmp"/hooktest-par.*
+[ "$allowed" = 3 ] && [ "$(jq .review.Saboteur "$proj/.flow/7.json")" = 3 ] \
+  && echo "ok    $F parallel 6 launches, 3 allowed" \
+  || { fail=1; echo "FAIL  $F parallel: $allowed allowed, count $(jq .review.Saboteur "$proj/.flow/7.json")"; }
+
 echo "# malformed input"
 t $G 0 'no command key'              ''
 printf '' | bash .claude/hooks/$G; [ $? = 0 ] && echo "ok    $G rc=0   empty stdin" || { fail=1; echo "FAIL  $G empty stdin"; }

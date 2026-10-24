@@ -134,8 +134,8 @@ The human index. Claude picks visible skills by description; the operator types 
 | wait-what | a re-pitch of the last message | operator | mattpocock/skills |
 | setup-matt-pocock-skills | tracker labels and doc layout (run once; done 2026-10-25, `docs/agents/*.md`) | operator | mattpocock/skills |
 | ask-matt | nothing; off, it routes to skills not installed here | nobody | mattpocock/skills |
-| hl-engineer (planned) | approved tickets, a plan comment on the issue, a local state file | operator | ours |
-| hl-plan-reviewer (planned agent) | plan findings per lens; read-only | Claude, through hl-engineer | ours |
+| hl-engineer (draft, not yet run) | approved tickets, a plan comment on the issue, a local state file | operator | ours |
+| hl-plan-reviewer (agent, draft) | plan findings per lens; read-only | Claude, through hl-engineer | ours |
 | hl-add-app (planned) | a PR with the app's manifests | operator (workflow) | ours |
 
 ## Hooks in force
@@ -145,7 +145,7 @@ The human index. Claude picks visible skills by description; the operator types 
 | `.claude/hooks/git-guard.sh` | PreToolUse on Bash | no merge, no push to main, no force push, no destructive local git |
 | `.claude/hooks/issue-template.sh` | PreToolUse on Bash matching gh issue | the four headings in every issue body |
 | `.claude/hooks/token-refresh.sh` | SessionStart; PreToolUse on Bash mentioning gh or git push | a fresh App token cache, minted outside the sandbox (never blocks) |
-| `.claude/hooks/flow-review-bound.sh` (in `hl-engineer` frontmatter, planned) | PreToolUse on Agent | at most 3 plan-review rounds per run |
+| `.claude/hooks/flow-review-bound.sh` (in `hl-engineer` frontmatter) | PreToolUse on Agent | at most 3 plan-review rounds per run |
 
 ## Sandbox
 
@@ -179,5 +179,5 @@ implement-spec, triage, research, handoff, claude-handoff, chief-of-staff, wizar
 code-review, prototype, tdd, retro, wait-what, setup-matt-pocock-skills), the Flux gitops-knowledge
 skill, the Terraform/OpenTofu skill, find-skills.
 
-Ours (`hl-` prefix): `hl-engineer` (conductor, planned), `hl-add-app` (repeatable workflow, planned
+Ours (`hl-` prefix): `hl-engineer` (conductor, draft), `hl-add-app` (repeatable workflow, planned
 after the KRO prototype). `hl-flow` was retired by ADR 0015.
