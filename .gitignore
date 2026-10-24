@@ -1,0 +1,9 @@
+# Claude Code: personal and runtime state
+CLAUDE.local.md
+.claude/settings.local.json
+.flow/
+# Never commit secrets or keys
+*.pem
+*.key
+.env
+.env.*

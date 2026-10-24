@@ -1,0 +1,46 @@
+{
+  "autoMemoryEnabled": false,
+  "permissions": {
+    "deny": ["Read(//mnt/**)", "Read(~/.ssh/**)", "Read(~/.config/homelab/**)"]
+  },
+  "sandbox": {
+    "enabled": true,
+    "failIfUnavailable": true,
+    "allowUnsandboxedCommands": false,
+    "excludedCommands": ["podman", "docker"],
+    "filesystem": { "denyRead": ["/mnt", "~/.ssh", "~/.config/homelab"] },
+    "network": {
+      "allowedDomains": [
+        "github.com", "api.github.com", "objects.githubusercontent.com", "raw.githubusercontent.com",
+        "codeload.github.com", "release-assets.githubusercontent.com",
+        "registry.npmjs.org", "registry.yarnpkg.com",
+        "ghcr.io", "pkg-containers.githubusercontent.com",
+        "registry-1.docker.io", "auth.docker.io", "production.cloudflare.docker.com", "index.docker.io",
+        "quay.io", "cdn.quay.io", "registry.k8s.io",
+        "dl.k8s.io", "get.helm.sh", "charts.jetstack.io", "charts.longhorn.io",
+        "fluxcd.io", "fluxoperator.dev", "kro.run", "docs.siderolabs.com", "factory.talos.dev",
+        "kind.sigs.k8s.io", "code.claude.com", "skills.sh"
+      ]
+    }
+  },
+  "skillOverrides": {
+    "research": "user-invocable-only",
+    "grilling": "user-invocable-only",
+    "domain-modeling": "user-invocable-only",
+    "code-review": "user-invocable-only",
+    "tdd": "user-invocable-only",
+    "prototype": "user-invocable-only",
+    "find-skills": "user-invocable-only"
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          { "type": "command", "command": "bash .claude/hooks/git-guard.sh" },
+          { "type": "command", "if": "Bash(gh issue *)", "command": "bash .claude/hooks/issue-template.sh" }
+        ]
+      }
+    ]
+  }
+}
