@@ -9,7 +9,11 @@ case "$cmd" in *"gh issue create"*|*"gh issue edit"*) ;; *) exit 0 ;; esac
 body=""
 if   printf '%s' "$cmd" | grep -qE -- '--body-file[= ]|-F[= ]'; then
   f="$(printf '%s' "$cmd" | sed -nE 's/.*(--body-file|-F)[= ]+("([^"]*)"|'"'"'([^'"'"']*)'"'"'|([^ ]+)).*/\3\4\5/p' | head -1)"
-  [ -n "$f" ] && [ -r "$f" ] && body="$(cat "$f")"
+  if [ -n "$f" ] && [ -r "$f" ]; then
+    body="$(cat "$f")"
+  else
+    printf 'Blocked: body file "%s" is not readable at check time. Write it in a separate step first and pass a literal absolute path (no variables).\n' "$f" >&2; exit 2
+  fi
 elif printf '%s' "$cmd" | grep -qE -- '--body[= ]|-b[= ]'; then
   body="$cmd"
 else
