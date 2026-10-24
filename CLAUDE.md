@@ -4,8 +4,7 @@ Backlog: GitHub Issues. Every issue has Goal, Done when, Out of scope, Depends o
 This repo is public: never commit secrets. Push protection and a pre-tool hook enforce it; this line is the reminder.
 
 ## How work flows
-- Research → `/research`. Plan → `/wayfinder` (big) or `/grill-with-docs` (one decision). Breakdown → `/to-tickets`. Document → ADRs via `/grill-with-docs`.
-- Enter every multi-stage task through `/hl-flow`; it calls exactly one skill per stage. Do not use plan mode, deep research or any other skill for those stages.
+- Skills are chosen by their descriptions; the catalog with triggers is in `docs/agents/harness.md`. Before any planning skill, read `docs/adr/README.md`. Skills that create issues, branches or PRs are hidden from Claude and typed by the operator.
 - A rule that must hold every time is a hook, never a sentence here.
 - Downloaded skills (listed in skills-lock.json) are never edited; wrap them in an `hl-` skill instead.
 
