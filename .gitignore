@@ -7,3 +7,18 @@ CLAUDE.local.md
 *.key
 .env
 .env.*
+# Personal shell and editor files: never belong in a repo; the sandbox masks these paths too
+.bash_profile
+.bashrc
+.profile
+.zprofile
+.zshrc
+.gitconfig
+.ripgreprc
+.idea/
+.vscode/
+# Claude Code per-user runtime state (agents, commands, workflows and .mcp.json stay tracked)
+.claude/launch.json
+.claude/loop.md
+.claude/routines
+.claude/scheduled_tasks.json
