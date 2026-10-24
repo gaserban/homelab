@@ -27,16 +27,20 @@ Claude Desktop WSL session. Decisions behind each step: ADR 0001, 0005, 0013, 00
 
 ## 3. In the Debian distro
 
-1. `sudo apt install git bubblewrap socat curl` (bubblewrap and socat are the sandbox's
-   requirements). Debian does not restrict unprivileged user namespaces by default; if the sandbox
-   still fails to start, follow the sandboxing docs' AppArmor note.
+1. `sudo apt install git bubblewrap socat curl jq` (bubblewrap and socat are the sandbox's
+   requirements; the hooks parse their input with jq and refuse to run without it). Debian does
+   not restrict unprivileged user namespaces by default; if the sandbox still fails to start,
+   follow the sandboxing docs' AppArmor note.
 2. Install the Proton Pass CLI (`pass-cli`) and log in once. Create the vault entries the bootstrap
    adapter will read; names are listed in `docs/adr/0008-secrets.md` once the first environment
    exists.
 3. Put the App key at `~/.config/homelab/app.pem`, `chmod 600`. In `~/.local/bin`, add a git
    credential helper and a `gh` wrapper that mint one-hour App installation tokens from the key
    (a small script using openssl and curl). Set the App's bot name and email with
-   `git config --global`, and set the helper.
+   `git config --global`, and set the helper. `~/.local/bin` must be on `PATH` before the helper
+   scripts work: Debian's `~/.profile` adds it only when the directory already exists at login, so
+   create the directory, log in again, and check that `command -v gh` resolves to the wrapper and
+   not to `/usr/bin/gh`.
 4. Install the container runtime per ADR 0005, rung by rung, until kind creates a cluster. Record
    the winning rung in the Podman prototype ticket.
 5. `git clone https://github.com/gaserban/homelab ~/src/homelab`.

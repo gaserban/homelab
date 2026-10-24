@@ -95,6 +95,9 @@ only if repeated corrections pile up faster than they are written down.
 
 ## Skill inventory
 
+Claude Code's bundled skills are off (`disableBundledSkills` in `.claude/settings.json`), so the
+skill list in a session is exactly the repository's: the downloaded ones below and ours.
+
 Downloaded (never edited; see skills-lock.json): the Anthropic plugin-dev guides (skill, hook,
 agent development), skill-creator, writing-for-agents, the planning suite from mattpocock/skills
 (ask-matt, grilling, grill-me, grill-with-docs, wayfinder, to-spec, to-tickets, implement,
