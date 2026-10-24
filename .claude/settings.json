@@ -25,13 +25,9 @@
     }
   },
   "skillOverrides": {
-    "research": "user-invocable-only",
-    "grilling": "user-invocable-only",
-    "domain-modeling": "user-invocable-only",
-    "code-review": "user-invocable-only",
-    "tdd": "user-invocable-only",
     "prototype": "user-invocable-only",
-    "find-skills": "user-invocable-only"
+    "find-skills": "user-invocable-only",
+    "ask-matt": "off"
   },
   "hooks": {
     "PreToolUse": [
