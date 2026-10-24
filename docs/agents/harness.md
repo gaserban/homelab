@@ -139,6 +139,7 @@ The human index. Claude picks visible skills by description; the operator types 
 | --- | --- | --- |
 | `.claude/hooks/git-guard.sh` | PreToolUse on Bash | no merge, no push to main, no force push, no destructive local git |
 | `.claude/hooks/issue-template.sh` | PreToolUse on Bash matching gh issue | the four headings in every issue body |
+| `.claude/hooks/token-refresh.sh` | SessionStart; PreToolUse on Bash mentioning gh or git push | a fresh App token cache, minted outside the sandbox (never blocks) |
 | review-loop (in `hl-engineer` frontmatter, planned) | Stop | the bounded review loop |
 
 ## Sandbox
@@ -147,7 +148,9 @@ Mandatory on WSL2. The network allowlist in `.claude/settings.json` starts with 
 Sandboxed commands cannot reach the host's loopback, so the dev cluster API is bound to the WSL
 interface address and that address and port are allowlisted; only the container runtime is excluded
 from the sandbox, because its socket is unavoidable. Read access to the Windows drives, the SSH
-directory and the App key directory is denied to the Read tool and the sandbox alike.
+directory and the App key directory is denied to the Read tool and the sandbox alike. Sandboxed
+`gh` and `git push` use the one-hour App token cached in `$XDG_RUNTIME_DIR/homelab-app-token`,
+which `token-refresh.sh` mints from the key outside the sandbox.
 
 ## Memory
 
