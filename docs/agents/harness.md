@@ -165,8 +165,12 @@ only if repeated corrections pile up faster than they are written down.
 
 ## Skill inventory
 
-Claude Code's bundled skills are off (`disableBundledSkills` in `.claude/settings.json`), so the
-skill list in a session is exactly the repository's: the downloaded ones below and ours.
+Claude Code's bundled skills are on only so that the bundled `/deep-research` workflow runs: every
+bundled skill is `off` in `skillOverrides` in `.claude/settings.json`, so the skill list in a session
+is the repository's (the downloaded ones below and ours) plus `/deep-research`. The overrides are a
+denylist: after a Claude Code update, check `/skills` for new bundled entries and turn them off.
+Bundled `/code-review` shares its name with the downloaded `code-review`, so it has no entry (an
+entry would hit both); check `/skills` shows the downloaded one.
 
 Downloaded (never edited; see skills-lock.json): the Anthropic plugin-dev guides (skill, hook,
 agent development), skill-creator, writing-for-agents, the planning suite from mattpocock/skills
