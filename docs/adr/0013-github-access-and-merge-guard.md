@@ -25,3 +25,11 @@ after approval. A CLAUDE.md line is a request; GitHub's ruleset and a hook are e
 - The App key still grants branch pushes and PR creation, which is its intended scope. Rotate on
   suspicion.
 - The hook guards Claude Code's own tool calls only; the ruleset covers every other path.
+
+## Bootstrap exception (2026-10-24)
+
+The bootstrap pull request (#1) and the first issues (#2 to #6) were created from the operator's
+Windows machine under the operator's own GitHub account, because the App credential exists only in
+the WSL setup that the pull request itself introduces. This is a one-time exception: from the first
+WSL session on, Claude acts as the App, and the operator's account is used only to approve and
+merge. The App key is not installed on the Windows machine.
