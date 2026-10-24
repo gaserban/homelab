@@ -1,5 +1,6 @@
 {
   "autoMemoryEnabled": false,
+  "disableBundledSkills": true,
   "permissions": {
     "deny": ["Read(//mnt/**)", "Read(~/.ssh/**)", "Read(~/.config/homelab/**)"]
   },
