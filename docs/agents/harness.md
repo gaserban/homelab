@@ -33,6 +33,11 @@ wrong twice, the same procedure pasted a third time, a rule that must hold every
    (hook), restrict (`skillOverrides`), route around, and fork only under its own ADR.
 7. State between stages lives in artifacts and a state file, never only in the conversation.
 8. A stage refuses to start without its predecessor's handover.
+9. A subagent runs on the smallest model that does its job, set in its agent file (`model:`) or on
+   the Agent call: Haiku for read-only fan-out lookups (Explore), Sonnet for bounded production work
+   with a spec in hand (research notes, implementers, graders), Opus for judgment that must be
+   adversarial (plan reviewers, mergers). The conductor runs on the session model, because the
+   operator is there.
 
 ## Stage to skill
 
@@ -56,15 +61,27 @@ conversation, because only there can it ask the operator.
 
 ```
 issue from the operator
- 1 Requirements    grilling, domain-modeling ─ gate
- 2 Plan            draft → hl-plan-reviewer ×3 lenses (Falsifier, Saboteur, Newcomer), read-only
-                   revise and repeat, at most 3 rounds (PreToolUse hook on Agent denies the 4th) ─ gate
- 3 Breakdown       parts ─ checkpoint
- 4 Adopt-or-build  per part: ADR-fixed → cite it; else one research run per candidate, in parallel,
-                   scored on the checklist; a verdict may send the flow back to 3 ─ gate
- 5 Publish         approved plan as one issue comment; operator types /to-tickets <issue>
+ 0 Intake          issue, ADRs, research notes; state file
+ 1 Prior art       one question per thing a practitioner already knows; Haiku lookups in the repo,
+                   Sonnet research upstream, in parallel; the plan cites it or says why not ─ checkpoint
+ 2 Requirements    grilling, domain-modeling ─ gate
+ 3 Plan            draft → hl-plan-reviewer ×3 lenses (Falsifier, Saboteur, Newcomer), read-only, Opus
+                   revise and repeat, at most 3 rounds (PreToolUse hook on Agent denies the 4th);
+                   the log lives in its own file, the brief stays under 3,000 words ─ gate
+ 4 Breakdown       parts as vertical slices; plan amendments, Saboteur once if they change the
+                   design ─ checkpoint
+ 5 Adopt-or-build  per part: ADR-fixed → cite it; else one research run per candidate, in parallel
+                   on Sonnet, scored on the checklist; a verdict may send the flow back to 4 ─ gate
+ 6 Publish         approved plan as one issue comment; operator types /to-tickets <issue>
                    → native sub-issues with native blocking links
+ 7 Close-out       headings, parent links, blocked-by edges, Done-when kept word for word ─ gate
 ```
+
+Every gate appends a row to `docs/agents/hl-engineer-runs.md` (answer, rounds, findings, brief
+size, minutes, the operator's friction). The skill is judged on those rows from real issues, and
+`/retro` over them every third run decides what changes; the eval set in
+`.claude/skills/hl-engineer/evals/evals.json` is the checklist the retro grades against. Stage 1 is
+not yet in ADR 0016's stage list and needs a superseding note.
 
 Gates are `AskUserQuestion` prompts (approve, revise, stop); `askUserQuestionTimeout` stays unset.
 The only typed command is `/to-tickets`, because it is author-hidden. At every checkpoint the
@@ -145,7 +162,7 @@ The human index. Claude picks visible skills by description; the operator types 
 | `.claude/hooks/git-guard.sh` | PreToolUse on Bash | no merge, no push to main, no force push, no destructive local git |
 | `.claude/hooks/issue-template.sh` | PreToolUse on Bash matching gh issue | the four headings in every issue body |
 | `.claude/hooks/token-refresh.sh` | SessionStart; PreToolUse on Bash mentioning gh or git push | a fresh App token cache, minted outside the sandbox (never blocks) |
-| `.claude/hooks/flow-review-bound.sh` (in `hl-engineer` frontmatter) | PreToolUse on Agent | at most 3 plan-review rounds per run |
+| `.claude/hooks/flow-review-bound.sh` | PreToolUse on Agent | at most 3 plan-review rounds per run; registered in settings so it holds in every session, subagents included |
 
 ## Sandbox
 

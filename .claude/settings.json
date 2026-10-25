@@ -48,6 +48,12 @@
           { "type": "command", "command": "bash .claude/hooks/token-refresh.sh" },
           { "type": "command", "if": "Bash(gh issue *)", "command": "bash .claude/hooks/issue-template.sh" }
         ]
+      },
+      {
+        "matcher": "Agent",
+        "hooks": [
+          { "type": "command", "command": "bash .claude/hooks/flow-review-bound.sh" }
+        ]
       }
     ]
   }

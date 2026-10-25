@@ -1,0 +1,84 @@
+{
+  "skill_name": "hl-engineer",
+  "notes": "Fixtures for each eval live in the skill-creator workspace under fixtures/<eval>/ and are copied into .flow/ before a run. Runs are unattended: a gate that closes without an answer counts as Stop, so every eval ends at its stage's gate with a `stopped` progress line. GitHub writes are allowed on #6 only; the close-out eval on #2 carries an operator instruction to write comments to a file instead. With-skill runs share one checkout and one state file, so they run one at a time. Iteration 1 (2026-10-25): plan 9/11 vs 3/11 baseline, breakdown 8/9 vs 5/9, close-out 8/8 vs 8/8 on the first assertion sets. Iteration 2 (2026-10-25, revised skill, the assertion sets below): plan 8/12 vs 2/12, breakdown 10/11 vs 4/11. Stage numbering since iteration 3: 0 intake, 1 prior art, 2 requirements, 3 plan (log in 03-review.md), 4 breakdown, 5 adopt-or-build, 6 publish, 7 close-out. Known harness limits: a frontmatter hook does not register when the skill is read as a file (the bound hook now lives in settings), AskUserQuestion is unavailable to subagents so every gate ends in Stop, and agent definitions appear to load once per session, so start a fresh session after editing .claude/agents. From iteration 3 on, the skill is measured on real runs through docs/agents/hl-engineer-runs.md; these assertions are the checklist a retro grades those runs against. The close-out assertions need rewriting around the protocol before that eval is rerun.",
+  "evals": [
+    {
+      "id": 0,
+      "prompt": "/hl-engineer resume 6",
+      "state": "stage plan: .flow/6.json with review counts at zero; .flow/6/00-intake.md, 01-prior-art.md and 02-requirements.md present",
+      "expected_output": "03-plan.md under 3,000 words with two or three options, a recommendation resting on ADR 0003, 0004 and 0012 and citing the prior-art brief, rollout, verification as one-line runnable checks tagged static, dev or operator, deletion safety that accounts for kro deleting an instance's children with protection in dev too, image architectures and the secrets path; Goal and Done when copied in; three reviewer lenses per round on Opus; 03-review.md with every finding fixed, rebutted or cut; state file updated; one `hl-engineer: plan approved|stopped` comment on #6; a run-record row; the run stops at the gate.",
+      "files": [],
+      "expectations": [
+        ".flow/6/03-plan.md exists and presents at least two options and one recommendation",
+        "The recommendation's `Rests on` line names ADR 0003, ADR 0004 and ADR 0012 and cites at least one block of 01-prior-art.md, or the plan says why it deviates from it",
+        "Every check, operator checks included, is one line reading `<command or action> → <expected signal>` with exactly one tag and no rider, and no check refers to another check; the count of exceptions is zero",
+        "The plan copies the issue's Goal and Done when word for word",
+        "Round 1 spawned three hl-plan-reviewer agents in one message on Opus with first lines `Lens: Falsifier`, `Lens: Saboteur`, `Lens: Newcomer`",
+        ".flow/6/03-review.md has a line for every finding of every round, each marked fixed, rebutted or cut, and 03-plan.md carries no review log",
+        "The final 03-plan.md is under 3,000 words",
+        "Either every lens passed on the final revision, or the brief's Open section names the findings the unreviewed last revision addresses",
+        "The plan's deletion-safety section states that kro deletes an instance's children, the PVC included, places protection on the instance, the Kustomization's deletionPolicy and a retaining storage class, and applies it in dev, not only in prod",
+        ".flow/6.json ends with status awaiting-operator or stopped and a changed updated timestamp, and its review counts equal the launches per lens recorded in the transcript",
+        "This run posted exactly one comment on issue #6 (identified by the id in the transcript), starting with `hl-engineer: plan approved` or `hl-engineer: plan stopped`, and a stopped line names `/hl-engineer resume 6`",
+        "No 04-parts.md was written and stage 4 did not start"
+      ]
+    },
+    {
+      "id": 1,
+      "prompt": "/hl-engineer resume 6",
+      "state": "stage breakdown: .flow/6.json with review counts 2, 1, 2; approved, corrected .flow/6/03-plan.md present with 01-prior-art.md and 02-requirements.md",
+      "expected_output": "04-parts.md under 2,000 words as a table of vertical slices with the checks written in the cells, every issue Done-when item mapped, a Plan amendments section with sources and a Saboteur pass for design-changing amendments labelled only after it ran; a checkpoint comment on #6 that matches the final brief; stage 5 with ADR citations for fixed parts and exactly one verdict per open part, research agents on Sonnet; the run stops at the stage-5 gate with a `stopped` line.",
+      "files": [],
+      "expectations": [
+        ".flow/6/04-parts.md has a table with columns for part, what it delivers, depends on, tool choice and runnable checks, and the checks cell holds the checks themselves, not references to another section",
+        "Every check is one line reading `<command or action> → <expected signal>` with exactly one tag and no rider, and no check refers to another check; the count of exceptions is zero",
+        "Each of the issue's six Done-when items maps to a part and the brief shows the mapping",
+        "Every part that deploys something is observable on dev by itself; a documentation-only part appears at most once, last, with static and operator checks",
+        "04-parts.md has a `## Plan amendments` section; every amendment cites a source; any amendment touching deletion safety, the fence, an option or the recommendation carries `reviewed: Saboteur round <r>` and the transcript shows that run happened before the checkpoint comment, or the brief says the bound blocked it",
+        "This run's checkpoint comment on issue #6 (identified by its id in the transcript) starts with `hl-engineer: breakdown checkpoint` and agrees with the final brief, amendment count included",
+        "05-verdicts.md exists; parts fixed by an ADR cite it and carry no verdict; every part whose tool column says open has exactly one verdict",
+        "Research agents ran on Sonnet (model: sonnet on the Agent call, visible in the transcript) and their notes exist, and no topic already covered by 01-prior-art.md was researched again",
+        "The run ended at the stage-5 gate with status stopped or awaiting-operator, posted a `hl-engineer: adopt-or-build stopped` line naming `/hl-engineer resume 6`, and started no stage 6",
+        ".flow/6.json review counts are unchanged from the fixture (2, 1, 2), or Saboteur is one higher and the transcript shows the amendment review",
+        "04-parts.md is under 2,000 words and 05-verdicts.md under 1,000"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "/hl-engineer resume 2",
+      "state": "stage close-out: .flow/2.json running; .flow/2/04-parts.md with four parts and dependencies 2→1, 3→2, 4→3; 06-publish.md naming #3 to #6 as the tickets; operator instruction: post nothing on #2, write would-be comments to .flow/2/comments.md",
+      "expected_output": "A gap report: #2 has no native sub-issues; #3 to #6 are linked by prose only; no native blocked-by edges; Done when not kept word for word, with an example; a fix per gap; no comment posted; status not done; 07-close-out.md written under 2,000 words. Iteration 1 showed the analysis assertions do not separate the skill from a bare Opus run; the protocol assertions below are what to grade.",
+      "files": [],
+      "expectations": [
+        "The report states that issue #2 has no native sub-issues, after checking through the GitHub API, and names #3, #4, #5 and #6 as the candidate tickets",
+        "The report compares native blocked-by edges against 04-parts.md (2→1, 3→2, 4→3) and shows that the tickets' `## Done when` did not keep the runnable checks word for word, quoting at least one example",
+        "Every gap comes with a fix command or edit",
+        ".flow/2/07-close-out.md is the stage brief, under 2,000 words, with Decided, Artifacts and Open sections",
+        ".flow/2.json ends with status stopped or awaiting-operator, not done, and a changed updated timestamp",
+        "The would-be progress line in .flow/2/comments.md reads `hl-engineer: close-out stopped. ...` and names `/hl-engineer resume 2`; nothing was posted on issue #2",
+        "The next-step commands (`/implement`, `/implement-spec`) were not announced as if the gate had been approved"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "/hl-engineer resume 6",
+      "state": "stage prior-art: .flow/6.json running with started set and review counts at zero; only .flow/6/00-intake.md present (intake done, no prior-art brief yet)",
+      "expected_output": "The conductor lists two to five practitioner questions from the intake brief, answers any that an ADR already settles from the ADR without an agent, spawns the rest in one message (Explore on Haiku for repo and docs lookups, the research skill on Sonnet for upstream sources, four agents unless the brief says why more), writes 01-prior-art.md with one block per question (established solution, dated source, what it settles or rules out for #6, which agent), marks unsourced questions unanswered, posts `hl-engineer: prior-art checkpoint`, moves on to requirements, and, unattended, stops at the requirements gate with a `stopped` line naming the resume command.",
+      "files": [],
+      "expectations": [
+        ".flow/6/01-prior-art.md exists with between two and five question blocks, each carrying Established solution, Source, For this issue and Agent lines",
+        "Every Source is a path that exists in the repository (an ADR or a docs/research note) or an upstream URL with a date; no block cites the conversation or memory",
+        "A question that an ADR already answers cites that ADR and spawned no agent",
+        "All agents for this stage were spawned in one message, at most four, or the brief states why more",
+        "Every repo or docs lookup ran as Explore on Haiku and every upstream lookup ran through the research skill on Sonnet, as the transcript's spawn records show; no Haiku agent wrote a research note",
+        "Each Sonnet research run left docs/research/<topic>.md, and a note about a tool scores it on the adopt-or-build checklist",
+        "Each block's For this issue line names what the answer settles or rules out for issue #6; none is generic",
+        "A question nobody could source is marked unanswered rather than answered from memory",
+        "01-prior-art.md is under 2,000 words",
+        "This run's checkpoint comment on issue #6 (identified by its id in the transcript) starts with `hl-engineer: prior-art checkpoint`",
+        "After the checkpoint the state file reads stage requirements; the run then stopped at the requirements gate with status stopped or awaiting-operator and posted `hl-engineer: requirements stopped` naming `/hl-engineer resume 6`",
+        "No 03-plan.md was written and stage 3 did not start"
+      ]
+    }
+  ]
+}

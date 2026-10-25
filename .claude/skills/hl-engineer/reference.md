@@ -3,7 +3,8 @@
 ## Brief
 
 One file per stage, `.flow/<n>/NN-<stage>.md`. A brief is decision-ready: pointers, not copies,
-and nothing secret (the plan comment quotes from it, and the repo is public).
+and nothing secret (the plan comment quotes from it, and the repo is public). The plan brief stays
+under 3,000 words and the others under 2,000; past that, the brief is copying what it should cite.
 
 ```markdown
 # <NN> <Stage> for #<n>: <issue title>
@@ -17,20 +18,48 @@ and nothing secret (the plan comment quotes from it, and the repo is public).
 ## Open
 - <question> (<who answers it, and by which stage>)
 
-## Review log (stage 2 only)
-- Round <r>, <lens>: <finding> → fixed: <how> | rebutted: <why>
+## Plan amendments (stage 4 only)
+- <what the plan said> → <what the breakdown found> (<source>; reviewed: Saboteur round <r> | not reviewed, why)
+```
+
+## Prior-art brief
+
+`01-prior-art.md`, written at the stage 1 checkpoint. One block per question; the plan cites the
+block or says why it deviates.
+
+```markdown
+## <question a practitioner would have answered>
+- Established solution: <what is commonly run or done, in one or two sentences>
+- Source: <docs/research/<topic>.md | ADR <nnnn> | <upstream URL>, dated>
+- For this issue: <what it settles, or what it rules out>
+- Agent: <haiku lookup | sonnet research>
+```
+
+## Review log
+
+`03-review.md`, one file for the whole loop, so the plan brief stays short and the history stays
+whole. Every finding from every round has a line, including the ones that were cut from scope.
+
+```markdown
+# Review log for #<n>
+
+## Round <r>
+Brief as reviewed: <words> words, <bytes> bytes.
+- <lens> <k> [blocker|major|minor]: <finding> → fixed: <what replaced what> | rebutted: <why> | cut: <moved where>
 ```
 
 ## Plan comment
 
-Posted once, at stage 5, on the source issue. `to-tickets` turns it into tickets, so each part
-reads as a ticket's raw material.
+Posted once, at stage 6, on the source issue. `to-tickets` turns it into tickets, so each part
+reads as a ticket's raw material: behavioural rather than procedural, durable (no file paths or
+line numbers that go stale), with acceptance criteria and a scope boundary, as the downloaded
+`triage` skill's `AGENT-BRIEF.md` describes an agent-ready brief.
 
 ```markdown
 ## hl-engineer: approved plan
 
 **Recommendation:** <one paragraph>
-**Rests on:** ADR <nnnn>, <research note>, ...
+**Rests on:** ADR <nnnn>, <research note>, <prior-art block>, ...
 
 ### Parts
 | # | Part | Delivers | Depends on | Tool |
@@ -63,3 +92,15 @@ gets "build" or "find another".
 | Pinning | images and charts can be pinned by digest or exact version |
 
 A part whose tool an ADR already fixes cites the ADR in place of a verdict.
+
+## Run record
+
+`docs/agents/hl-engineer-runs.md`, tracked in git, one row per gate, appended after the operator
+answers. Minutes count from the state file's `started`. Findings are per round, as `r1/r2/r3`.
+Friction is the operator's words when they chose Revise or Stop, or `-`.
+
+```markdown
+| Date | Issue | Stage | Answer | Rounds F/S/N | Findings | Plan words | Amendments | Minutes | Friction |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 2026-10-25 | #6 | plan | approve at bound | 3/3/3 | 33/24/18 | 2,900 | - | 64 | reviewers repeat themselves after round 2 |
+```
