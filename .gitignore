@@ -27,3 +27,5 @@ CLAUDE.local.md
 # skills are tracked
 .claude/skills/*
 !.claude/skills/hl-*/
+# Dev runtime state: the kind kubeconfig holds cluster-admin credentials
+.state/
