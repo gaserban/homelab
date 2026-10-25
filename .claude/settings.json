@@ -20,6 +20,7 @@
         "dl.k8s.io", "get.helm.sh", "charts.jetstack.io", "charts.longhorn.io",
         "fluxcd.io", "fluxoperator.dev", "kro.run", "docs.siderolabs.com", "factory.talos.dev",
         "kind.sigs.k8s.io", "code.claude.com", "skills.sh",
+        "bcr.bazel.build", "releases.bazel.build", "mirror.bazel.build",
         "127.0.0.1:8888", "127.0.0.1:6443", "127.0.0.1:5001"
       ]
     }
