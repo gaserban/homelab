@@ -39,7 +39,8 @@
   "hooks": {
     "SessionStart": [
       { "hooks": [{ "type": "command", "command": "bash .claude/hooks/token-refresh.sh" }] },
-      { "hooks": [{ "type": "command", "command": "bash .claude/hooks/skills-restore.sh", "timeout": 120 }] }
+      { "hooks": [{ "type": "command", "command": "bash .claude/hooks/skills-restore.sh", "timeout": 120 }] },
+      { "hooks": [{ "type": "command", "command": "bash .claude/hooks/branch-cleanup.sh", "timeout": 60 }] }
     ],
     "PreToolUse": [
       {
