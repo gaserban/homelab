@@ -21,3 +21,4 @@ Supersede by adding a new ADR and marking the old one Superseded; never edit a d
 | [0014](0014-agent-harness.md) | The Claude Code harness: sandbox, skills, hooks, memory, flows (router bullet superseded by 0015, gate clause by 0016) |
 | [0015](0015-skill-visibility-and-routing.md) | Skill visibility by the documented rule; the hl-flow router retired; two flow tiers (three passages superseded by 0016) |
 | [0016](0016-engineer-flow-and-skill-divergence.md) | The engineer flow ends at tickets; divergences from downloaded skills climb a ladder |
+| [0017](0017-downloaded-skills-restored-not-committed.md) | Downloaded skills are restored per checkout from skills-lock.json, not committed |

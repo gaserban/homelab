@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Regression tests for the hooks. Run from anywhere: bash .claude/hooks/test.sh
 # Guard cases feed a PreToolUse JSON payload to a hook and check the exit code (2 = blocked,
-# 0 = allowed); token-refresh cases check whether the hook called a stub helper.
+# 0 = allowed); token-refresh cases check whether the hook called a stub helper; skills-restore
+# cases restore from a local git repository standing in for GitHub.
 # Exits 1 if any case mismatches.
 set -u
 cd "$(dirname "$0")/../.." || exit 1
@@ -157,6 +158,60 @@ allowed=$(cat "$tmp"/hooktest-par.* | grep -c '^0$'); rm -f "$tmp"/hooktest-par.
 [ "$allowed" = 3 ] && [ "$(jq .review.Saboteur "$proj/.flow/7.json")" = 3 ] \
   && echo "ok    $F parallel 6 launches, 3 allowed" \
   || { fail=1; echo "FAIL  $F parallel: $allowed allowed, count $(jq .review.Saboteur "$proj/.flow/7.json")"; }
+
+echo "# skills-restore: restores the skills in skills-lock.json, keeping only hash matches"
+sk="$tmp/hooktest-skills"; up="$sk/up/acme/kit.git"; proj="$sk/proj"; rm -rf "$sk"
+mkdir -p "$up/skills/one" "$up/skills/multi/agents" "$proj"
+printf 'one\n' > "$up/skills/one/SKILL.md"; printf '{}\n' > "$up/skills/one/metadata.json"
+printf 's\n' > "$up/skills/multi/SKILL.md"; printf 'm\n' > "$up/skills/multi/SKILL-MECHANICS.md"
+printf 'x\n' > "$up/skills/multi/agents/x.yaml"
+gc() { git -C "$up" -c user.name=t -c user.email=t@t "$@" >/dev/null 2>&1; }
+gc init -q; gc add -A; gc commit -qm v1
+h() { printf "$1" | sha256sum | cut -d' ' -f1; }
+lockjson() { # lockjson [jq filter]. Hashes written out by hand: snapshot scheme for one and multi
+  # (multi in localeCompare order), the CLI's folder scheme for "One Folder".
+  jq -n --arg one "$(h 'SKILL.md\0one\n\0')" --arg folder "$(h 'SKILL.mdone\n')" \
+    --arg multi "$(h 'agents/x.yaml\0x\n\0SKILL-MECHANICS.md\0m\n\0SKILL.md\0s\n\0')" '{version: 1, skills: {
+      one: {source: "acme/kit", sourceType: "github", skillPath: "skills/one/SKILL.md", computedHash: $one},
+      multi: {source: "acme/kit", sourceType: "github", skillPath: "skills/multi/SKILL.md", computedHash: $multi},
+      "One Folder": {source: "acme/kit", sourceType: "github", skillPath: "skills/one/SKILL.md", computedHash: $folder}}}' \
+    | jq "${1:-.}" > "$proj/skills-lock.json"
+}
+s() { # s <expected rc> <label> [git base]
+  local want=$1 label=$2 gb=${3:-file://$sk/up}
+  CLAUDE_PROJECT_DIR="$proj" HOMELAB_SKILLS_GIT_BASE="$gb" bash .claude/hooks/skills-restore.sh </dev/null >/dev/null 2>"$tmp/hooktest.err"; local rc=$?
+  if [ "$rc" = "$want" ]; then printf 'ok    %-7s %-5s %s\n' skills "rc=$rc" "$label"
+  else fail=1; printf 'FAIL  %-7s want=%s got=%s %s\n      %s\n' skills "$want" "$rc" "$label" "$(head -1 "$tmp/hooktest.err")"; fi
+}
+k() { # k <label> <test...>: checks the state a run left behind
+  local label=$1; shift
+  if "$@"; then printf 'ok    %-7s %-5s %s\n' skills check "$label"; else fail=1; printf 'FAIL  %-7s %s\n' skills "$label"; fi
+}
+SK="$proj/.claude/skills"
+lockjson
+s 0 'restores missing skills'
+k 'single-file skill in place'       [ -f "$SK/one/SKILL.md" ]
+k 'metadata.json left out'           [ ! -e "$SK/one/metadata.json" ]
+k 'multi-file, localeCompare order'  [ -f "$SK/multi/SKILL-MECHANICS.md" ]
+k 'folder scheme, CLI folder name'   [ -f "$SK/one-folder/SKILL.md" ]
+s 0 'stamp hit: no download'         file:///nonexistent
+rm "$SK/.restored"
+s 0 'lock changed, folders intact: no download' file:///nonexistent
+printf 'edited\n' >> "$SK/one/SKILL.md"; rm "$SK/.restored"
+s 0 'edited folder is restored'
+k 'edit undone'                      cmp -s "$SK/one/SKILL.md" "$up/skills/one/SKILL.md"
+printf 'one v2\n' > "$up/skills/one/SKILL.md"; gc commit -qam v2; rm -rf "$SK/one"
+s 1 'upstream moved past the lock'
+k 'mismatch not installed'           [ ! -e "$SK/one" ]
+k 'no stamp while a skill is missing' [ ! -e "$SK/.restored" ]
+printf 'one\n' > "$up/skills/one/SKILL.md"; gc commit -qam v3
+lockjson '.skills.evil = {source: "acme/kit", sourceType: "github", skillPath: "../../x/SKILL.md", computedHash: "0"}'
+s 1 'skillPath with .. skipped'
+lockjson '.skills.evil = {source: "acme/kit;id", sourceType: "github", skillPath: "skills/one/SKILL.md", computedHash: "0"}'
+s 1 'unsafe source skipped'
+k 'the rest still restored'          [ -f "$SK/one/SKILL.md" ]
+rm "$proj/skills-lock.json"
+s 0 'no skills-lock.json'
 
 echo "# malformed input"
 t $G 0 'no command key'              ''

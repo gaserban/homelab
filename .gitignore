@@ -23,3 +23,7 @@ CLAUDE.local.md
 .claude/routines
 .claude/scheduled_tasks.json
 .claude/output-styles
+# Downloaded skills: restored from skills-lock.json at session start (ADR 0017); only our own hl-
+# skills are tracked
+.claude/skills/*
+!.claude/skills/hl-*/

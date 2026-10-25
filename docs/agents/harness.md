@@ -28,7 +28,8 @@ wrong twice, the same procedure pasted a third time, a rule that must hold every
 3. Every action skill leaves a durable artifact: a file, an ADR, an issue, a PR.
 4. Anything coordinating more than a handful of agents is a saved workflow, not an improvised fan-out.
 5. Subagents get the narrowest tool list that does the job. A reviewer cannot edit.
-6. Downloaded skills (skills-lock.json) are wrapped, never edited. Our skills carry the `hl-` prefix.
+6. Downloaded skills (skills-lock.json) are wrapped, never edited, never committed: a SessionStart
+   hook restores them (ADR 0017). Our skills carry the `hl-` prefix.
    A divergence climbs the ladder in ADR 0016: configure (`docs/agents/*.md`, CLAUDE.md), enforce
    (hook), restrict (`skillOverrides`), route around, and fork only under its own ADR.
 7. State between stages lives in artifacts and a state file, never only in the conversation.
@@ -189,12 +190,14 @@ denylist: after a Claude Code update, check `/skills` for new bundled entries an
 Bundled `/code-review` shares its name with the downloaded `code-review`, so it has no entry (an
 entry would hit both); check `/skills` shows the downloaded one.
 
-Downloaded (never edited; see skills-lock.json): the Anthropic plugin-dev guides (skill, hook,
-agent development), skill-creator, writing-for-agents, the planning suite from mattpocock/skills
-(ask-matt, grilling, grill-me, grill-with-docs, wayfinder, to-spec, to-tickets, implement,
-implement-spec, triage, research, handoff, claude-handoff, chief-of-staff, wizard, domain-modeling,
-code-review, prototype, tdd, retro, wait-what, setup-matt-pocock-skills), the Flux gitops-knowledge
-skill, the Terraform/OpenTofu skill, find-skills.
+Downloaded (never edited; gitignored, restored from skills-lock.json at session start by
+`skills-restore.sh`, which keeps a folder only if it matches the lock's hash; ADR 0017): the
+Anthropic plugin-dev guides (skill, hook, agent development), skill-creator, writing-for-agents, the
+planning suite from mattpocock/skills (ask-matt, grilling, grill-me, grill-with-docs, wayfinder,
+to-spec, to-tickets, implement, implement-spec, triage, research, handoff, claude-handoff,
+chief-of-staff, wizard, domain-modeling, code-review, prototype, tdd, retro, wait-what,
+setup-matt-pocock-skills), the Flux gitops-knowledge skill, the Terraform/OpenTofu skill,
+find-skills.
 
 Ours (`hl-` prefix): `hl-engineer` (conductor, draft), `hl-add-app` (repeatable workflow, planned
 after the KRO prototype). `hl-flow` was retired by ADR 0015.
