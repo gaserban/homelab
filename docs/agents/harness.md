@@ -49,10 +49,10 @@ wrong twice, the same procedure pasted a third time, a rule that must hold every
 | Spec | `to-spec` | operator | spec issue |
 | Breakdown | `to-tickets` | operator | tickets in the four-part template with blocking links |
 | Documenting | `domain-modeling`, reached through `grill-with-docs` | operator | ADRs, GLOSSARY.md |
-| Build | `implement` | operator | branch and PR |
+| Build | `implement` | operator | commits on the feature's branch; the PR once the feature is complete |
 | Review | `code-review` as a read-only subagent | Claude | PR findings |
 | Agent briefs | `triage` | operator | agent-ready briefs on tickets |
-| Parallel build | `implement-spec` | operator | PRs per ready ticket |
+| Parallel build | `implement-spec` | operator | one integration branch and PR for the spec |
 
 ## The engineer flow
 
@@ -152,7 +152,7 @@ The human index. Claude picks visible skills by description; the operator types 
 | to-spec | a spec issue | operator | mattpocock/skills |
 | to-tickets | tickets with blocking edges | operator | mattpocock/skills |
 | implement | a branch and commits, through tdd and code-review | operator | mattpocock/skills |
-| implement-spec | PRs per ready ticket | operator | mattpocock/skills |
+| implement-spec | one integration branch and PR for the spec | operator | mattpocock/skills |
 | triage | labels and agent-ready briefs on issues | operator | mattpocock/skills |
 | handoff, claude-handoff | a handoff file; claude-handoff also starts a background session | operator | mattpocock/skills |
 | retro | a retrospective | operator | mattpocock/skills |
