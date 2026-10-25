@@ -213,6 +213,45 @@ k 'the rest still restored'          [ -f "$SK/one/SKILL.md" ]
 rm "$proj/skills-lock.json"
 s 0 'no skills-lock.json'
 
+echo "# branch-cleanup: deletes local branches whose tip a merged PR already holds"
+bc="$tmp/hooktest-branches"; rm -rf "$bc"; mkdir -p "$bc"
+g() { git -C "$bc/$1" -c user.name=t -c user.email=t@t -c init.defaultBranch=main "${@:2}" >/dev/null 2>&1; }
+git init -q --bare -b main "$bc/origin.git"; git clone -q "$bc/origin.git" "$bc/repo" 2>/dev/null
+g repo commit -q --allow-empty -m base; g repo push -q origin main
+mk() { g repo switch -q -c "$1" main; g repo commit -q --allow-empty -m "$1"; g repo push -q -u origin "$1"; }
+mk done; mk partial; mk ahead; mk open; mk wt-clean; mk wt-dirty; mk here
+g repo switch -q partial; g repo commit -q --allow-empty -m more; g repo push -q origin partial; g repo reset -q --hard HEAD~1
+g repo switch -q ahead; g repo commit -q --allow-empty -m unmerged
+g repo switch -q main; g repo commit -q --allow-empty -m on-main; g repo push -q origin main; g repo reset -q --hard HEAD~1
+g repo worktree add -q "$bc/wt-clean" wt-clean; g repo worktree add -q "$bc/wt-dirty" wt-dirty; touch "$bc/wt-dirty/x"
+heads=""; for b in done ahead wt-clean wt-dirty here; do heads+="$b $(git -C "$bc/repo" rev-parse "origin/$b")"$'\n'; done
+heads+="partial $(git -C "$bc/repo" rev-parse origin/partial)"
+printf '#!/bin/sh\ncat <<"EOF"\n%s\nEOF\n' "$heads" > "$bc/gh"; chmod +x "$bc/gh"
+g repo push -q origin --delete done ahead; g repo switch -q here
+CLAUDE_PROJECT_DIR="$bc/repo" HOMELAB_GH="$bc/gh" bash .claude/hooks/branch-cleanup.sh </dev/null >"$tmp/hooktest.out" 2>"$tmp/hooktest.err"; rc=$?
+has() { git -C "$bc/repo" show-ref -q --verify "refs/heads/$1"; }
+c() { # c <label> <test...>
+  local label=$1; shift
+  if "$@"; then printf 'ok    %-7s %s\n' branch "$label"; else fail=1; printf 'FAIL  %-7s %s\n' branch "$label"; fi
+}
+c 'rc=1: dirty worktree reported'      [ "$rc" = 1 ]
+c 'merged head deleted'                 eval '! has done'
+c 'ancestor of merged head deleted'     eval '! has partial'
+c 'commits past the PR kept'            has ahead
+c 'branch without merged PR kept'       has open
+c 'clean worktree removed with branch'  eval '! has wt-clean && [ ! -d "$bc/wt-clean" ]'
+c 'dirty worktree and branch kept'      eval 'has wt-dirty && [ -d "$bc/wt-dirty" ]'
+c 'merged current branch: now on main'  eval '! has here && [ "$(git -C "$bc/repo" branch --show-current)" = main ]'
+c 'main fast-forwarded'                 [ "$(git -C "$bc/repo" rev-parse main)" = "$(git -C "$bc/repo" rev-parse origin/main)" ]
+c 'gone, unmerged branch listed'        grep -q 'kept: ahead' "$tmp/hooktest.out"
+touch "$bc/repo/x"; g repo switch -q -c here2 main; g repo push -q -u origin here2
+printf '#!/bin/sh\necho "here2 %s"\n' "$(git -C "$bc/repo" rev-parse here2)" > "$bc/gh"
+CLAUDE_PROJECT_DIR="$bc/repo" HOMELAB_GH="$bc/gh" bash .claude/hooks/branch-cleanup.sh </dev/null >/dev/null 2>&1
+c 'merged current branch, dirty: kept'  eval 'has here2 && [ "$(git -C "$bc/repo" branch --show-current)" = here2 ]'
+printf '#!/bin/sh\nexit 1\n' > "$bc/gh"
+CLAUDE_PROJECT_DIR="$bc/repo" HOMELAB_GH="$bc/gh" bash .claude/hooks/branch-cleanup.sh </dev/null >/dev/null 2>&1; rc=$?
+c 'gh failing: rc=1, nothing deleted'   eval '[ "$rc" = 1 ] && has here2 && has ahead'
+
 echo "# malformed input"
 t $G 0 'no command key'              ''
 printf '' | bash .claude/hooks/$G; [ $? = 0 ] && echo "ok    $G rc=0   empty stdin" || { fail=1; echo "FAIL  $G empty stdin"; }

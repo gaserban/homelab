@@ -163,6 +163,7 @@ The human index. Claude picks visible skills by description; the operator types 
 | `.claude/hooks/git-guard.sh` | PreToolUse on Bash | no merge, no push to main, no force push, no destructive local git |
 | `.claude/hooks/issue-template.sh` | PreToolUse on Bash matching gh issue | the four headings in every issue body |
 | `.claude/hooks/token-refresh.sh` | SessionStart; PreToolUse on Bash mentioning gh or git push | a fresh App token cache, minted outside the sandbox (never blocks) |
+| `.claude/hooks/branch-cleanup.sh` | SessionStart | local branches whose tip a merged PR holds are deleted (with their clean worktree; a merged current branch moves to main if clean), main is fast-forwarded (never blocks) |
 | `.claude/hooks/flow-review-bound.sh` | PreToolUse on Agent | at most 3 plan-review rounds per run; registered in settings so it holds in every session, subagents included |
 
 ## Sandbox
