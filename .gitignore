@@ -29,3 +29,7 @@ CLAUDE.local.md
 !.claude/skills/hl-*/
 # Dev runtime state: the kind kubeconfig holds cluster-admin credentials
 .state/
+# Bazel: output symlinks, the per-user rc file (absolute paths, ADR 0019), and Claude's worktrees
+/bazel-*
+/user.bazelrc
+/.claude/worktrees/
