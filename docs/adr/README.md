@@ -23,3 +23,4 @@ Supersede by adding a new ADR and marking the old one Superseded; never edit a d
 | [0016](0016-engineer-flow-and-skill-divergence.md) | The engineer flow ends at tickets; divergences from downloaded skills climb a ladder |
 | [0017](0017-downloaded-skills-restored-not-committed.md) | Downloaded skills are restored per checkout from skills-lock.json, not committed |
 | [0018](0018-dev-runtime-user-and-sandbox-tunnel.md) | Dev runtime: rootless Podman under its own user, reached from the sandbox through SSH |
+| [0019](0019-monorepo-on-bazel.md) | Monorepo on Bazel; tools from Bazel; languages wired when first used (Proposed) |
