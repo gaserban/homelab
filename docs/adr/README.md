@@ -9,7 +9,7 @@ Supersede by adding a new ADR and marking the old one Superseded; never edit a d
 | [0002](0002-gitops-engine-flux.md) | GitOps engine: Flux via the Flux Operator |
 | [0003](0003-apps-request-platform-provides-kro.md) | Apps request, platform provides: KRO behind a prototype gate |
 | [0004](0004-environments-and-dev-loop.md) | Environments: kind dev synced from a local artifact, qa deferred, Talos prod |
-| [0005](0005-dev-container-runtime.md) | Dev container runtime: Podman first, with a tested fallback ladder |
+| [0005](0005-dev-container-runtime.md) | Dev container runtime: Podman first, with a tested fallback ladder (result: rung 1, kind on rootful Podman) |
 | [0006](0006-storage-longhorn.md) | Storage: Longhorn, one replica until more nodes |
 | [0007](0007-external-resources-and-interfaces.md) | External resources: OpenTofu, HCP Terraform, external-dns; one interface per external purpose |
 | [0008](0008-secrets.md) | Secrets: OpenBao in-cluster; root secrets from the vault via a bootstrap adapter |

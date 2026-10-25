@@ -47,8 +47,10 @@ Claude Desktop WSL session. Decisions behind each step: ADR 0001, 0005, 0013, 00
    `~/.local/bin` must be on `PATH` before the helper scripts work: Debian's `~/.profile` adds it
    only when the directory already exists at login, so create the directory, log in again, and
    check that `command -v gh` resolves to the wrapper and not to `/usr/bin/gh`.
-4. Install the container runtime per ADR 0005, rung by rung, until kind creates a cluster. Record
-   the winning rung in the Podman prototype ticket.
+4. Install the container runtime per ADR 0005 (rung 1 won): `sudo apt install podman`, kind from
+   its release binary into `/usr/local/bin`, then
+   `sudo env KIND_EXPERIMENTAL_PROVIDER=podman kind create cluster` and the registry,
+   `sudo podman run -d --name kind-registry --network kind -p 127.0.0.1:5001:5000 docker.io/library/registry:3`.
 5. `git clone https://github.com/gaserban/homelab ~/src/homelab`.
 6. Open a Claude Desktop WSL session in `~/src/homelab`. The first session's task is the harness
    skeleton ticket.
