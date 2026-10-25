@@ -1,15 +1,21 @@
 #!/usr/bin/env bash
 # hl-runtime CMD...: run CMD against the dev runtime (ADR 0005): the homelab-runtime user's rootless
-# Podman API, the kind API server and the registry, all listening on host loopback.
-# The Claude Code sandbox has its own network namespace and Go never proxies loopback, so inside it
-# each port is bridged through the sandbox proxy for the life of CMD. Outside it, CMD connects directly.
+# Podman API (127.0.0.1:8888), the kind API server (6443) and the registry (5000), all on host loopback.
+#
+# Outside the Claude Code sandbox CMD connects directly. Inside it, the host's loopback is out of
+# reach (own network namespace) and the sandbox proxy drops a connection when the client half-closes
+# it, which breaks `podman exec -i` and so `kind create cluster`. So CMD's ports are forwarded through
+# one SSH connection to the hl-tunnel container (tools/tunnel), which carries end-of-input in-band.
+# If the tunnel is down, it is rebuilt and started over a plain bridge to the API first.
 set -euo pipefail
 
-PODMAN_API_PORT=8888
-BRIDGED_PORTS=(8888 6443 5001)   # Podman API, kind API server, registry
+API_PORT=8888
+TUNNEL_PORT=5001
+FORWARDED_PORTS=(8888 6443 5000)   # Podman API, kind API server, registry
 repo=$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)
+state="$repo/.state/tunnel"
 
-export CONTAINER_HOST="tcp://127.0.0.1:$PODMAN_API_PORT"   # podman, and kind through it, run remote
+export CONTAINER_HOST="tcp://127.0.0.1:$API_PORT"   # podman, and kind through it, run remote
 export KIND_EXPERIMENTAL_PROVIDER=podman
 export KUBECONFIG="${KUBECONFIG:-$repo/.state/kubeconfig}"
 mkdir -p "$(dirname "$KUBECONFIG")"
@@ -20,23 +26,64 @@ if [[ ! -w "${XDG_RUNTIME_DIR:-/nonexistent}" ]]; then
 fi
 
 reachable() { (exec 3<>"/dev/tcp/127.0.0.1/$1") 2>/dev/null; }
+wait_for() { for _ in $(seq 50); do reachable "$1" && return 0; sleep 0.1; done; return 1; }
 
 pids=()
-if ! reachable "$PODMAN_API_PORT"; then
-  proxy=${HTTP_PROXY:-${http_proxy:-}}
-  if [[ -z "$proxy" ]]; then
-    echo "hl-runtime: nothing on 127.0.0.1:$PODMAN_API_PORT; is homelab-podman-api.service running?" >&2
-    exit 1
+cleanup() { (( ${#pids[@]} )) && { kill "${pids[@]}" 2>/dev/null || true; }; pids=(); }
+trap cleanup EXIT
+
+# The sandbox proxy, from HTTP_PROXY: host, port, and user:password if any.
+parse_proxy() {
+  local hp=${HTTP_PROXY:-${http_proxy:-}}
+  [[ -n "$hp" ]] || { echo "hl-runtime: nothing on 127.0.0.1:$API_PORT and no proxy; is homelab-podman-api.service running?" >&2; exit 1; }
+  hp=${hp#*://}; hp=${hp%/}; proxy_auth=""
+  if [[ "$hp" == *@* ]]; then proxy_auth=${hp%@*}; hp=${hp##*@}; fi
+  proxy_host=${hp%:*}; proxy_port=${hp##*:}
+}
+
+# Keys live in .state (gitignored); the image bakes in the host key and the client's public key.
+ensure_keys() {
+  mkdir -p "$state"
+  [[ -f "$state/client_ed25519" ]] || ssh-keygen -q -t ed25519 -N '' -C hl-runtime-client -f "$state/client_ed25519"
+  [[ -f "$state/ssh_host_ed25519_key" ]] || ssh-keygen -q -t ed25519 -N '' -C hl-tunnel-host -f "$state/ssh_host_ed25519_key"
+  printf 'restrict,port-forwarding %s\n' "$(cat "$state/client_ed25519.pub")" > "$state/authorized_keys"
+  printf '[127.0.0.1]:%s %s\n' "$TUNNEL_PORT" "$(cut -d' ' -f1,2 "$state/ssh_host_ed25519_key.pub")" > "$state/known_hosts"
+}
+
+open_tunnel() {
+  local fwd=() p
+  for p in "${FORWARDED_PORTS[@]}"; do fwd+=(-L "127.0.0.1:$p:127.0.0.1:$p"); done
+  ssh -F /dev/null -N -o BatchMode=yes -o ExitOnForwardFailure=yes -o IdentitiesOnly=yes \
+    -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$state/known_hosts" -i "$state/client_ed25519" \
+    -o "ProxyCommand=socat - PROXY:$proxy_host:%h:%p,proxyport=$proxy_port${proxy_auth:+,proxyauth=$proxy_auth}" \
+    -o ServerAliveInterval=30 "${fwd[@]}" -p "$TUNNEL_PORT" tunnel@127.0.0.1 2>/dev/null &
+  pids+=("$!")
+  wait_for "$API_PORT"   # forwards listen only after authentication
+}
+
+# Rebuild and (re)start hl-tunnel over a plain bridge to the API; ordinary API calls survive the proxy.
+start_tunnel_container() {
+  echo "hl-runtime: SSH tunnel down; building and starting hl-tunnel" >&2
+  socat "TCP-LISTEN:$API_PORT,bind=127.0.0.1,fork,reuseaddr" \
+    "PROXY:$proxy_host:127.0.0.1:$API_PORT,proxyport=$proxy_port${proxy_auth:+,proxyauth=$proxy_auth}" 2>/dev/null &
+  pids+=("$!")
+  wait_for "$API_PORT"
+  cp "$repo/tools/tunnel/Containerfile" "$repo/tools/tunnel/sshd_config" "$state/"
+  podman build -q -t localhost/hl-tunnel:dev "$state" >/dev/null
+  podman rm -f hl-tunnel >/dev/null 2>&1 || true
+  podman run -d --name hl-tunnel --network host --restart unless-stopped localhost/hl-tunnel:dev >/dev/null
+  cleanup
+  sleep 1
+}
+
+if ! reachable "$API_PORT"; then
+  parse_proxy
+  ensure_keys
+  if ! open_tunnel; then
+    cleanup
+    start_tunnel_container
+    open_tunnel || { echo "hl-runtime: SSH tunnel to hl-tunnel failed after a restart" >&2; exit 1; }
   fi
-  hostport=${proxy#*://}; hostport=${hostport%/}; auth=""
-  if [[ "$hostport" == *@* ]]; then auth=${hostport%@*}; hostport=${hostport##*@}; fi
-  for p in "${BRIDGED_PORTS[@]}"; do
-    socat "TCP-LISTEN:$p,bind=127.0.0.1,fork,reuseaddr" \
-      "PROXY:${hostport%:*}:127.0.0.1:$p,proxyport=${hostport##*:}${auth:+,proxyauth=$auth}" 2>/dev/null &
-    pids+=("$!")
-  done
-  trap 'kill "${pids[@]}" 2>/dev/null || true' EXIT
-  for _ in $(seq 50); do reachable "$PODMAN_API_PORT" && break; sleep 0.1; done
 fi
 
 "$@"

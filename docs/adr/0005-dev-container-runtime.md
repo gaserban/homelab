@@ -27,26 +27,26 @@ this ADR is updated.
 
 Date: 2026-10-25. Issue #4.
 
-Rung 1 won; rungs 2 and 3 were not tried.
+Rung 1 won, first rootful and then rootless; rungs 2 and 3 were not tried.
 
 - Host: Debian 13 in WSL2, kernel 6.6.114.1-microsoft-standard-WSL2, `cgroup_no_v1=all` on the
   kernel command line, so `/sys/fs/cgroup` is cgroup v2 only.
-- Runtime: Debian's `podman` 5.4.2, rootful, crun, systemd cgroup manager.
-- Cluster: kind v0.33.0, node image `kindest/node:v1.37.0`.
-  `sudo env KIND_EXPERIMENTAL_PROVIDER=podman kind create cluster --wait 3m` reached Ready after
-  15 seconds; the cgroup failure from the 2025 issue did not appear.
-- Registry: `docker.io/library/registry:3` as `kind-registry` on the `kind` network, published on
-  `127.0.0.1:5001`. `flux push artifact oci://localhost:5001/...` (flux v2.9.6,
-  `--insecure-registry`) succeeded and the tag was listed by the registry.
+- Rootful: Debian's `podman` 5.4.2 (crun, systemd cgroup manager) and kind v0.33.0 with node image
+  `kindest/node:v1.37.0`. `sudo env KIND_EXPERIMENTAL_PROVIDER=podman kind create cluster` reached
+  Ready after 15 seconds; the cgroup failure from the 2025 issue did not appear. A `registry:3`
+  container took a `flux push artifact` (flux v2.9.6). Rejected as the standing setup because every
+  command needs `sudo`, so Claude could not drive it.
+- Rootless, the standing setup (ADR 0018): the same Podman under the `homelab-runtime` user, driven
+  by Claude from the sandbox through `tools/hl-runtime`. `kind create cluster --config
+  tools/kind-dev.yaml` reached Ready after 14 seconds; kubectl from the sandbox lists the node Ready
+  and every system pod Running; `kind-registry` on `127.0.0.1:5000` took a `flux push artifact` and
+  listed the tag. Three failures on the way, each fixed in `tools/setup-dev-runtime.sh`:
+  - kind refused to start ("requires setting systemd property Delegate=yes"): the Podman API
+    service's own cgroup had only `memory pids`. Fixed with cgroup delegation to user sessions and
+    `Delegate=yes` on the service.
+  - kind timed out at "Preparing nodes": the node booted, but with the journald log driver a system
+    user's `podman logs` is empty, so kind never saw the boot line. Fixed with `k8s-file` logs.
+  - kind failed at "Installing CNI": the sandbox proxy drops a connection on client half-close,
+    which `podman exec -i` relies on. Fixed by the SSH tunnel in ADR 0018.
 
-What the result changes in the consequences above:
-
-- Every `podman` and `kind` command runs through `sudo`, and kind writes its kubeconfig to root's
-  home; a user kubeconfig comes from `sudo kind get kubeconfig`. The `podman` entry in the sandbox's
-  `excludedCommands` does not let Claude drive the runtime, because Claude cannot `sudo`. Container
-  operations stay with the operator until a ticket decides how Claude reaches the root socket.
-- The sandbox has its own network namespace, so the host's `127.0.0.1:5001` is not its loopback.
-  Claude reaches the registry only through the sandbox proxy, with `127.0.0.1:5001` allowed. Go
-  never proxies loopback addresses, so `flux push` from the sandbox needs a local forwarder through
-  the proxy (the test used `socat`). The dev loop (ADR 0004) has to settle this before Claude
-  pushes artifacts routinely.
+The last consequence above no longer holds: no runtime command is excluded from the sandbox (ADR 0018).

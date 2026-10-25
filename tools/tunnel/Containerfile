@@ -1,0 +1,12 @@
+# The SSH tunnel the sandbox reaches the dev runtime through (ADR 0005). The sandbox proxy drops a
+# connection when the client half-closes it, which breaks `podman exec -i`; SSH forwarding carries
+# end-of-input in its own protocol instead. Built and started on demand by tools/hl-runtime.
+FROM docker.io/library/alpine:3.22
+RUN apk add --no-cache openssh-server \
+ && adduser -D -s /sbin/nologin tunnel \
+ && sed -i "s/^tunnel:!/tunnel:*/" /etc/shadow
+COPY sshd_config /etc/ssh/sshd_config
+COPY ssh_host_ed25519_key /etc/ssh/ssh_host_ed25519_key
+COPY authorized_keys /etc/ssh/authorized_keys
+RUN chmod 600 /etc/ssh/ssh_host_ed25519_key && chmod 644 /etc/ssh/authorized_keys
+ENTRYPOINT ["/usr/sbin/sshd", "-D", "-e"]

@@ -49,8 +49,8 @@ Claude Desktop WSL session. Decisions behind each step: ADR 0001, 0005, 0013, 00
    check that `command -v gh` resolves to the wrapper and not to `/usr/bin/gh`.
 4. `sudo apt install podman`, then run `tools/setup-dev-runtime.sh` (ADR 0005): rootless Podman
    under the `homelab-runtime` user with its API on `127.0.0.1:8888`, kind, kubectl and flux, and
-   the sandbox settings that let Claude reach them. Claude then creates the cluster and registry
-   itself through `tools/hl-runtime`.
+   the sandbox settings that let Claude reach them. Claude then creates the cluster and the registry
+   (`127.0.0.1:5000`) itself through `tools/hl-runtime`, which tunnels over SSH (ADR 0018).
 5. `git clone https://github.com/gaserban/homelab ~/src/homelab`.
 6. Open a Claude Desktop WSL session in `~/src/homelab`. The first session's task is the harness
    skeleton ticket.

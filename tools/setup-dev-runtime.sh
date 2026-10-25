@@ -370,7 +370,8 @@ pause
 # ──────────────────────────────────────────────────────────────────────────
 stage "Let the sandbox reach the runtime"
 say "Claude cannot edit .claude/settings.json, so this stage does. Two changes:"
-step "allowedDomains gains $LOOPBACK_HOSTS (Podman API, kind API server, registry)."
+step "allowedDomains gains $LOOPBACK_HOSTS: the Podman API, the kind API server"
+step "(unused since the SSH tunnel; drop it later) and the hl-tunnel SSH port (ADR 0018)."
 step "excludedCommands (podman, docker) goes: it never took effect, and Claude now"
 step "runs podman inside the sandbox as a client of the runtime user's API."
 if grep -q '"127.0.0.1:8888"' "$SETTINGS" && ! grep -q '"excludedCommands"' "$SETTINGS"; then
@@ -395,7 +396,7 @@ step "Restart the Claude session (close and reopen it) so it loads the new setti
 pause
 
 finish
-note "Tell Claude the runtime is up; it creates the cluster and registry with tools/hl-runtime."
+note "Tell Claude the runtime is up; tools/hl-runtime starts the SSH tunnel and the cluster itself."
 }
 
 run_wizard "$@"; exit

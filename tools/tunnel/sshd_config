@@ -1,0 +1,15 @@
+# Loopback only, one key, local forwards to the runtime's ports only, nothing else.
+ListenAddress 127.0.0.1
+Port 5001
+HostKey /etc/ssh/ssh_host_ed25519_key
+AuthorizedKeysFile /etc/ssh/authorized_keys
+AllowUsers tunnel
+PasswordAuthentication no
+KbdInteractiveAuthentication no
+PermitRootLogin no
+AllowTcpForwarding local
+PermitOpen 127.0.0.1:8888 127.0.0.1:6443 127.0.0.1:5000
+X11Forwarding no
+AllowAgentForwarding no
+PermitTTY no
+ForceCommand /bin/false
