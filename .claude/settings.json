@@ -1,6 +1,6 @@
 {
   "autoMemoryEnabled": false,
-  "disableBundledSkills": true,
+  "disableBundledSkills": false,
   "permissions": {
     "deny": ["Read(//mnt/**)", "Read(~/.ssh/**)", "Read(~/.config/homelab/**)"]
   },
@@ -28,7 +28,13 @@
     "prototype": "user-invocable-only",
     "find-skills": "user-invocable-only",
     "ask-matt": "off",
-    "plugin-authoring": "off"
+    "plugin-authoring": "off",
+    "artifact-capabilities": "off", "artifact-diagramming": "off", "batch": "off", "claude-api": "off",
+    "claude-in-chrome": "off", "dataviz": "off", "debug": "off", "design": "off", "design-sync": "off",
+    "doctor": "off", "fewer-permission-prompts": "off", "loop": "off", "run": "off",
+    "run-skill-generator": "off", "simplify": "off", "slides": "off", "update-config": "off",
+    "verify": "off", "workflow-authoring": "off", "artifact-design": "off", "keybindings-help": "off",
+    "schedule": "off", "init": "off", "security-review": "off"
   },
   "hooks": {
     "SessionStart": [
@@ -42,6 +48,12 @@
           { "type": "command", "command": "bash .claude/hooks/git-guard.sh" },
           { "type": "command", "command": "bash .claude/hooks/token-refresh.sh" },
           { "type": "command", "if": "Bash(gh issue *)", "command": "bash .claude/hooks/issue-template.sh" }
+        ]
+      },
+      {
+        "matcher": "Agent",
+        "hooks": [
+          { "type": "command", "command": "bash .claude/hooks/flow-review-bound.sh" }
         ]
       }
     ]

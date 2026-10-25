@@ -9,15 +9,33 @@ set -u
 command -v jq >/dev/null 2>&1 || {
   printf 'issue-template.sh: jq is required to parse the tool input (docs/operator-setup.md, section 3).\n' >&2; exit 2; }
 cmd="$(jq -r '.tool_input.command // empty' 2>/dev/null)"
-# Match "gh issue create|edit" only where a command starts (line start, after ; & | ( or $( ),
-# not inside a commit message or a heredoc that merely mentions it.
+# Detect the command on a copy with heredoc bodies removed, so a file or message that merely quotes
+# "gh issue edit ..." on its own line is not mistaken for the command. The body check further down
+# reads the full text, because a body may legitimately arrive through a heredoc.
+awkprog=$(cat <<'AWK'
+inh { if ($0 ~ ("^[[:space:]]*" term "[[:space:]]*$")) inh = 0; next }
+{
+  if (match($0, /<<-?[[:space:]]*["']?[A-Za-z_][A-Za-z0-9_]*["']?/)) {
+    term = substr($0, RSTART, RLENGTH)
+    sub(/^<<-?[[:space:]]*["']?/, "", term); sub(/["']$/, "", term)
+    inh = 1
+  }
+  print
+}
+AWK
+)
+code="$(printf '%s\n' "$cmd" | awk "$awkprog")"
+# A command starts at the beginning of a line or after ; & | ( or $( . Split there and look for a
+# segment that is itself "gh issue create|edit ...". Asking for help is not creating an issue.
 s='[[:space:]]'
-nl=$'\n'
-start="(^|[;&|(]|\\\$\\(|${nl})${s}*"
-if   [[ "$cmd" =~ ${start}gh${s}+issue${s}+create ]]; then mode=create
-elif [[ "$cmd" =~ ${start}gh${s}+issue${s}+edit ]];   then mode=edit
-else exit 0
-fi
+mode=""
+while IFS= read -r seg; do
+  [[ "$seg" =~ ^${s}*gh${s}+issue${s}+(create|edit)(${s}|$) ]] || continue
+  m="${BASH_REMATCH[1]}"
+  if [[ "$seg" =~ (^|${s})(--help|-h)(${s}|$) ]]; then exit 0; fi
+  mode="$m"; break
+done < <(printf '%s\n' "$code" | sed -E 's/\$\(|[;&|(]/\n/g')
+[ -n "$mode" ] || exit 0
 
 body=""
 if   printf '%s' "$cmd" | grep -qE -- '(^|[[:space:]])(--body-file|-F)[= ]'; then

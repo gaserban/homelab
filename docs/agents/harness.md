@@ -1,7 +1,7 @@
 # The agent harness
 
 How Claude Code is set up in this repository and how its flows compose. Decisions are recorded in
-ADR 0013 and ADR 0014; this document is the architecture they refer to. Anthropic's rule governs
+ADR 0013 to ADR 0016; this document is the architecture they refer to. Anthropic's rule governs
 growth: nothing is built up front; each piece is added when its trigger appears (a convention got
 wrong twice, the same procedure pasted a third time, a rule that must hold every time).
 
@@ -30,8 +30,15 @@ wrong twice, the same procedure pasted a third time, a rule that must hold every
 5. Subagents get the narrowest tool list that does the job. A reviewer cannot edit.
 6. Downloaded skills (skills-lock.json) are wrapped, never edited, never committed: a SessionStart
    hook restores them (ADR 0017). Our skills carry the `hl-` prefix.
+   A divergence climbs the ladder in ADR 0016: configure (`docs/agents/*.md`, CLAUDE.md), enforce
+   (hook), restrict (`skillOverrides`), route around, and fork only under its own ADR.
 7. State between stages lives in artifacts and a state file, never only in the conversation.
 8. A stage refuses to start without its predecessor's handover.
+9. A subagent runs on the smallest model that does its job, set in its agent file (`model:`) or on
+   the Agent call: Haiku for read-only fan-out lookups (Explore), Sonnet for bounded production work
+   with a spec in hand (research notes, implementers, graders), Opus for judgment that must be
+   adversarial (plan reviewers, mergers). The conductor runs on the session model, because the
+   operator is there.
 
 ## Stage to skill
 
@@ -49,32 +56,46 @@ wrong twice, the same procedure pasted a third time, a rule that must hold every
 
 ## The engineer flow
 
-`/hl-engineer` is a conductor. It calls one skill per stage and stops at the human gates.
+`/hl-engineer <issue>` is a conductor (ADR 0016). It takes one GitHub issue to approved tickets
+and stops; `/implement` or `/implement-spec` take over from there. Every stage runs in the main
+conversation, because only there can it ask the operator.
 
 ```
-design from the operator
- 1 Requirements  grill-with-docs ─ gate: shared understanding confirmed
- 2 Plan          wayfinder, or the ADRs from stage 1
- 3 Research      research, forked; adopt-or-build checklist ─ gate: verdict accepted
- 4 Breakdown     to-spec, to-tickets
- 5 Build         implement
- 6 Review loop   code-review (read-only subagent)
-                 pass → 7; fail and rounds < N → 5 (Stop hook refuses to end the turn);
-                 fail and rounds = N → stop and ask the operator
-                 gate: PR approved
- 7 Agent briefs  triage → hand-off to implement-spec (separate flow)
+issue from the operator
+ 0 Intake          issue, ADRs, research notes; state file
+ 1 Prior art       one question per thing a practitioner already knows; Haiku lookups in the repo,
+                   Sonnet research upstream, in parallel; the plan cites it or says why not ─ checkpoint
+ 2 Requirements    grilling, domain-modeling ─ gate
+ 3 Plan            draft → hl-plan-reviewer ×3 lenses (Falsifier, Saboteur, Newcomer), read-only, Opus
+                   revise and repeat, at most 3 rounds (PreToolUse hook on Agent denies the 4th);
+                   the log lives in its own file, the brief stays under 3,000 words ─ gate
+ 4 Breakdown       parts as vertical slices; plan amendments, Saboteur once if they change the
+                   design ─ checkpoint
+ 5 Adopt-or-build  per part: ADR-fixed → cite it; else one research run per candidate, in parallel
+                   on Sonnet, scored on the checklist; a verdict may send the flow back to 4 ─ gate
+ 6 Publish         approved plan as one issue comment; operator types /to-tickets <issue>
+                   → native sub-issues with native blocking links
+ 7 Close-out       headings, parent links, blocked-by edges, Done-when kept word for word ─ gate
 ```
 
-Stages 1 to 4 are human gates: their skills are hidden, so the conductor writes the handover,
-names the skill, and the operator types it. Stages 5 and 6 are workflows the conductor launches.
+Every gate appends a row to `docs/agents/hl-engineer-runs.md` (answer, rounds, findings, brief
+size, minutes, the operator's friction). The skill is judged on those rows from real issues, and
+`/retro` over them every third run decides what changes; the eval set in
+`.claude/skills/hl-engineer/evals/evals.json` is the checklist the retro grades against. Stage 1 is
+not yet in ADR 0016's stage list and needs a superseding note.
 
-State file: `.flow/<run>.json` with stage, status (running or awaiting-operator), review round, N.
-Handover: at every boundary the finishing stage updates the state file and writes
-`.flow/<run>/handoff-<stage>.md` with the `handoff` skill (what was decided, where the artifacts
-are, what is open, which skill runs next; pointers, not copies; nothing sensitive). Resume is
-`/hl-engineer resume`: read the state file, read the latest handover, continue.
+Gates are `AskUserQuestion` prompts (approve, revise, stop); `askUserQuestionTimeout` stays unset.
+The only typed command is `/to-tickets`, because it is author-hidden. At every checkpoint the
+conductor posts a one- or two-line progress comment on the source issue.
 
-Adopt-or-build checklist, applied by the research stage: maintained within the last year,
+State file: `.flow/<issue>.json` with stage, status (running or awaiting-operator), review round.
+Checkpoint briefs: `.flow/<issue>/NN-<stage>.md`, written by the conductor itself (what was
+decided, where the artifacts are, what is open; pointers, not copies; nothing sensitive). Both are
+gitignored; the durable record is the issue. `handoff` is not used: it is hidden and writes to
+`$TMPDIR`. Resume is `/hl-engineer resume <issue>`: read the state file and the latest brief,
+continue.
+
+Adopt-or-build checklist, applied in stage 4: maintained within the last year,
 permissive licence, passing security audits, more than one maintainer, multi-architecture images,
 pinned by digest. Fail any, and the verdict is build or find another.
 
@@ -89,11 +110,11 @@ sessions is files, issues and pull requests.
   are our own model-visible skills or prompts in the script. The PR review is the gate; nothing
   is typed between stages.
 - **Gated flows** (for example `hl-engineer`) are conductor skills, hidden and typed by the
-  operator. An unattended stage (the review loop, the parallel build) is a workflow the
-  conductor launches. A stage owned by an author-hidden skill (`wayfinder`, `to-spec`,
-  `to-tickets`, `implement`) is a human gate: the conductor writes the handover, updates
-  `.flow/<run>.json`, names the skill to type, and resumes on `/hl-engineer resume`. A conductor
-  never calls a hidden skill.
+  operator. Gates are `AskUserQuestion` prompts in the conductor's turn. A stage owned by an
+  author-hidden skill (`wayfinder`, `to-spec`, `to-tickets`, `implement`) is a typed gate: the
+  conductor writes its brief, updates `.flow/<issue>.json`, names the skill to type, and resumes
+  on `/hl-engineer resume <issue>`. A conductor never calls a hidden skill. A workflow is used
+  only for a stage with no sign-off inside it.
 - Orchestration stays inside Claude Code. LangChain and LangGraph are not in Anthropic's docs
   and would bypass the sandbox, hooks, permissions and skills. If orchestration in code is ever
   needed, the documented path is the Agent SDK: the same harness, in Python or TypeScript.
@@ -129,9 +150,10 @@ The human index. Claude picks visible skills by description; the operator types 
 | retro | a retrospective | operator | mattpocock/skills |
 | chief-of-staff | subagent results and wiki files | operator | mattpocock/skills |
 | wait-what | a re-pitch of the last message | operator | mattpocock/skills |
-| setup-matt-pocock-skills | tracker labels and doc layout (run once) | operator | mattpocock/skills |
+| setup-matt-pocock-skills | tracker labels and doc layout (run once; done 2026-10-25, `docs/agents/*.md`) | operator | mattpocock/skills |
 | ask-matt | nothing; off, it routes to skills not installed here | nobody | mattpocock/skills |
-| hl-engineer (planned) | a PR, a state file, handovers | operator | ours |
+| hl-engineer (draft, not yet run) | approved tickets, a plan comment on the issue, a local state file | operator | ours |
+| hl-plan-reviewer (agent, draft) | plan findings per lens; read-only | Claude, through hl-engineer | ours |
 | hl-add-app (planned) | a PR with the app's manifests | operator (workflow) | ours |
 
 ## Hooks in force
@@ -141,7 +163,7 @@ The human index. Claude picks visible skills by description; the operator types 
 | `.claude/hooks/git-guard.sh` | PreToolUse on Bash | no merge, no push to main, no force push, no destructive local git |
 | `.claude/hooks/issue-template.sh` | PreToolUse on Bash matching gh issue | the four headings in every issue body |
 | `.claude/hooks/token-refresh.sh` | SessionStart; PreToolUse on Bash mentioning gh or git push | a fresh App token cache, minted outside the sandbox (never blocks) |
-| review-loop (in `hl-engineer` frontmatter, planned) | Stop | the bounded review loop |
+| `.claude/hooks/flow-review-bound.sh` | PreToolUse on Agent | at most 3 plan-review rounds per run; registered in settings so it holds in every session, subagents included |
 
 ## Sandbox
 
@@ -161,17 +183,21 @@ only if repeated corrections pile up faster than they are written down.
 
 ## Skill inventory
 
-Claude Code's bundled skills are off (`disableBundledSkills` in `.claude/settings.json`), so the
-skill list in a session is exactly the repository's: the downloaded ones below and ours.
+Claude Code's bundled skills are on only so that the bundled `/deep-research` workflow runs: every
+bundled skill is `off` in `skillOverrides` in `.claude/settings.json`, so the skill list in a session
+is the repository's (the downloaded ones below and ours) plus `/deep-research`. The overrides are a
+denylist: after a Claude Code update, check `/skills` for new bundled entries and turn them off.
+Bundled `/code-review` shares its name with the downloaded `code-review`, so it has no entry (an
+entry would hit both); check `/skills` shows the downloaded one.
 
 Downloaded (never edited; gitignored, restored from skills-lock.json at session start by
 `skills-restore.sh`, which keeps a folder only if it matches the lock's hash; ADR 0017): the
-Anthropic plugin-dev guides (skill, hook,
-agent development), skill-creator, writing-for-agents, the planning suite from mattpocock/skills
-(ask-matt, grilling, grill-me, grill-with-docs, wayfinder, to-spec, to-tickets, implement,
-implement-spec, triage, research, handoff, claude-handoff, chief-of-staff, wizard, domain-modeling,
-code-review, prototype, tdd, retro, wait-what, setup-matt-pocock-skills), the Flux gitops-knowledge
-skill, the Terraform/OpenTofu skill, find-skills.
+Anthropic plugin-dev guides (skill, hook, agent development), skill-creator, writing-for-agents, the
+planning suite from mattpocock/skills (ask-matt, grilling, grill-me, grill-with-docs, wayfinder,
+to-spec, to-tickets, implement, implement-spec, triage, research, handoff, claude-handoff,
+chief-of-staff, wizard, domain-modeling, code-review, prototype, tdd, retro, wait-what,
+setup-matt-pocock-skills), the Flux gitops-knowledge skill, the Terraform/OpenTofu skill,
+find-skills.
 
-Ours (`hl-` prefix): `hl-engineer` (conductor, planned), `hl-add-app` (repeatable workflow, planned
+Ours (`hl-` prefix): `hl-engineer` (conductor, draft), `hl-add-app` (repeatable workflow, planned
 after the KRO prototype). `hl-flow` was retired by ADR 0015.

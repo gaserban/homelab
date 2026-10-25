@@ -3,7 +3,8 @@
 Date: 2026-10-24
 
 Status: Accepted, except the bullet "The hl-flow router is the single entry point and calls
-exactly one skill", which is superseded by ADR 0015.
+exactly one skill", which is superseded by ADR 0015, and the clause "plain stops at human gates",
+which is superseded by ADR 0016.
 
 ## Context
 
