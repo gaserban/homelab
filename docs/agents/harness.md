@@ -61,19 +61,27 @@ and stops; `/implement` or `/implement-spec` take over from there. Every stage r
 conversation, because only there can it ask the operator.
 
 ```
-issue from the operator
+issue from the operator (or a free-text request: draft → operator confirms → issue created)
  0 Intake          issue, ADRs, research notes; state file
  1 Prior art       one question per thing a practitioner already knows; Haiku lookups in the repo,
-                   Sonnet research upstream, in parallel; the plan cites it or says why not ─ checkpoint
- 2 Requirements    grilling, domain-modeling ─ gate
- 3 Plan            draft → hl-plan-reviewer ×3 lenses (Falsifier, Saboteur, Newcomer), read-only, Opus
-                   revise and repeat, at most 3 rounds (PreToolUse hook on Agent denies the 4th);
-                   the log lives in its own file, the brief stays under 3,000 words ─ gate
+                   Sonnet research upstream, in parallel; a question only a run can answer gets a
+                   sandbox experiment under $TMPDIR/hl-proto/<n>/, cleaned up after; the plan cites
+                   it or says why not ─ checkpoint
+ 2 Requirements    grilling (trust-boundary questions first for harness and tooling issues),
+                   domain-modeling ─ gate
+ 3 Plan            draft + 03-checks.md → hl-plan-reviewer ×3 lenses (Falsifier, Saboteur, Newcomer),
+                   read-only, Opus; every lens reruns every round; a lens passes with no blocker or
+                   major (the reviewer's severity rubric); majors must fall 30% over two rounds or
+                   the gate recommends a split; fixes that add a mechanism are logged as new
+                   surfaces; the bound is max_rounds (PreToolUse hook on Agent), raised only at a
+                   gate with a stated purpose; the log and the checks live in their own files, the
+                   brief stays under 3,000 words ─ gate
  4 Breakdown       parts as vertical slices; plan amendments, Saboteur once if they change the
                    design ─ checkpoint
  5 Adopt-or-build  per part: ADR-fixed → cite it; else one research run per candidate, in parallel
                    on Sonnet, scored on the checklist; a verdict may send the flow back to 4 ─ gate
- 6 Publish         approved plan as one issue comment; operator types /to-tickets <issue>
+ 6 Publish         approved issue amendments applied; approved plan as one issue comment;
+                   operator types /to-tickets <issue>
                    → native sub-issues with native blocking links
  7 Close-out       headings, parent links, blocked-by edges, Done-when kept word for word ─ gate
 ```
