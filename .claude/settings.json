@@ -8,7 +8,6 @@
     "enabled": true,
     "failIfUnavailable": true,
     "allowUnsandboxedCommands": false,
-    "excludedCommands": ["podman", "docker"],
     "filesystem": { "denyRead": ["/mnt", "~/.ssh", "~/.config/homelab"] },
     "network": {
       "allowedDomains": [
@@ -20,7 +19,8 @@
         "quay.io", "cdn.quay.io", "registry.k8s.io",
         "dl.k8s.io", "get.helm.sh", "charts.jetstack.io", "charts.longhorn.io",
         "fluxcd.io", "fluxoperator.dev", "kro.run", "docs.siderolabs.com", "factory.talos.dev",
-        "kind.sigs.k8s.io", "code.claude.com", "skills.sh"
+        "kind.sigs.k8s.io", "code.claude.com", "skills.sh",
+        "127.0.0.1:8888", "127.0.0.1:6443", "127.0.0.1:5001"
       ]
     }
   },

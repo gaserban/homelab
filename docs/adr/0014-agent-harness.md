@@ -4,7 +4,9 @@ Date: 2026-10-24
 
 Status: Accepted, except the bullet "The hl-flow router is the single entry point and calls
 exactly one skill", which is superseded by ADR 0015, and the clause "plain stops at human gates",
-which is superseded by ADR 0016.
+which is superseded by ADR 0016, and the sentence "Only the container runtime is excluded from the
+sandbox; the dev cluster API is bound to the WSL interface address so cluster tools stay
+sandboxed.", which is superseded by ADR 0018.
 
 ## Context
 
