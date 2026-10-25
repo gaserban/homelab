@@ -5,7 +5,8 @@
 # Outside the Claude Code sandbox CMD connects directly. Inside it, the host's loopback is out of
 # reach (own network namespace) and the sandbox proxy drops a connection when the client half-closes
 # it, which breaks `podman exec -i` and so `kind create cluster`. So CMD's ports are forwarded through
-# one SSH connection to the hl-tunnel container (tools/tunnel), which carries end-of-input in-band.
+# one SSH connection to the hl-tunnel container (tools/sandbox-tunnel), which carries end-of-input
+# in-band.
 # If the tunnel is down, it is rebuilt and started over a plain bridge to the API first.
 set -euo pipefail
 
@@ -68,7 +69,7 @@ start_tunnel_container() {
     "PROXY:$proxy_host:127.0.0.1:$API_PORT,proxyport=$proxy_port${proxy_auth:+,proxyauth=$proxy_auth}" 2>/dev/null &
   pids+=("$!")
   wait_for "$API_PORT"
-  cp "$repo/tools/tunnel/Containerfile" "$repo/tools/tunnel/sshd_config" "$state/"
+  cp "$repo/tools/sandbox-tunnel/Containerfile" "$repo/tools/sandbox-tunnel/sshd_config" "$state/"
   podman build -q -t localhost/hl-tunnel:dev "$state" >/dev/null
   podman rm -f hl-tunnel >/dev/null 2>&1 || true
   podman run -d --name hl-tunnel --network host --restart unless-stopped localhost/hl-tunnel:dev >/dev/null
