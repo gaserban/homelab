@@ -318,19 +318,37 @@ Description=Podman API for the homelab dev runtime (ADR 0005), loopback only
 
 [Service]
 Type=exec
+# kind checks the controllers in this service's own cgroup; upstream podman.service sets it too.
+Delegate=yes
 ExecStart=/usr/bin/podman system service --time=0 tcp://127.0.0.1:$API_PORT
 Restart=on-failure
 
 [Install]
 WantedBy=default.target
 UNIT
+# A system user cannot read its own entries back from the journal, so with the journald default
+# `podman logs` comes back empty and kind never sees its node boot. Plain log files instead.
+as_runtime mkdir -p "$RUNTIME_HOME/.config/containers"
+as_runtime tee "$RUNTIME_HOME/.config/containers/containers.conf" >/dev/null <<CONF
+[containers]
+log_driver = "k8s-file"
+CONF
 user_systemctl daemon-reload
-user_systemctl enable --now "$API_UNIT"
+user_systemctl enable "$API_UNIT"
+user_systemctl restart "$API_UNIT"   # a re-run picks up unit changes
 for _ in $(seq 50); do curl -fsS "http://127.0.0.1:$API_PORT/_ping" >/dev/null 2>&1 && break; sleep 0.2; done
 if [[ "$(curl -fsS "http://127.0.0.1:$API_PORT/_ping" 2>/dev/null)" == OK ]]; then
   ok "Podman API answers on 127.0.0.1:$API_PORT"
   CONTAINER_HOST="tcp://127.0.0.1:$API_PORT" podman info \
     --format '  rootless={{.Host.Security.Rootless}} cgroup={{.Host.CgroupsVersion}} controllers={{.Host.CgroupControllers}} net={{.Host.RootlessNetworkCmd}}'
+  controllers=$(CONTAINER_HOST="tcp://127.0.0.1:$API_PORT" podman info --format '{{.Host.CgroupControllers}}')
+  for c in cpu cpuset io memory pids; do
+    [[ " ${controllers//[\[\]]/} " == *" $c "* ]] || { warn "controller $c missing; kind will refuse to start"; exit 1; }
+  done
+  ok "all five cgroup controllers reach the Podman API"
+  logdriver=$(CONTAINER_HOST="tcp://127.0.0.1:$API_PORT" podman info --format '{{.Host.LogDriver}}')
+  [[ "$logdriver" == k8s-file ]] || { warn "log driver is $logdriver, not k8s-file; kind will hang"; exit 1; }
+  ok "container logs go to files (k8s-file)"
 else
   warn "Podman API did not answer. Its log:"
   sudo journalctl _UID="$uid" -n 30 --no-pager || true
