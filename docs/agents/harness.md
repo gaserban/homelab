@@ -28,7 +28,8 @@ wrong twice, the same procedure pasted a third time, a rule that must hold every
 3. Every action skill leaves a durable artifact: a file, an ADR, an issue, a PR.
 4. Anything coordinating more than a handful of agents is a saved workflow, not an improvised fan-out.
 5. Subagents get the narrowest tool list that does the job. A reviewer cannot edit.
-6. Downloaded skills (skills-lock.json) are wrapped, never edited. Our skills carry the `hl-` prefix.
+6. Downloaded skills (skills-lock.json) are wrapped, never edited, never committed: a SessionStart
+   hook restores them (ADR 0017). Our skills carry the `hl-` prefix.
 7. State between stages lives in artifacts and a state file, never only in the conversation.
 8. A stage refuses to start without its predecessor's handover.
 
@@ -163,7 +164,9 @@ only if repeated corrections pile up faster than they are written down.
 Claude Code's bundled skills are off (`disableBundledSkills` in `.claude/settings.json`), so the
 skill list in a session is exactly the repository's: the downloaded ones below and ours.
 
-Downloaded (never edited; see skills-lock.json): the Anthropic plugin-dev guides (skill, hook,
+Downloaded (never edited; gitignored, restored from skills-lock.json at session start by
+`skills-restore.sh`, which keeps a folder only if it matches the lock's hash; ADR 0017): the
+Anthropic plugin-dev guides (skill, hook,
 agent development), skill-creator, writing-for-agents, the planning suite from mattpocock/skills
 (ask-matt, grilling, grill-me, grill-with-docs, wayfinder, to-spec, to-tickets, implement,
 implement-spec, triage, research, handoff, claude-handoff, chief-of-staff, wizard, domain-modeling,
