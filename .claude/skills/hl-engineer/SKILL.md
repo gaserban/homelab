@@ -191,8 +191,12 @@ loop**:
 
 Done when every lens passed, or the operator chose at the bound. **Gate.**
 
-**4 Breakdown.** Cut the plan into **vertical slices**: each part deployable and verifiable alone
-on dev. A part that only records a decision (an ADR update) is allowed, last, with static and
+**4 Breakdown.** Cut the plan into **vertical slices**: each part verifiable alone on dev, on the
+feature's branch. The parts are tickets of one feature: they land on the spec's integration branch
+in dependency order and ship as one PR, so a part's prerequisites name that branch, never a merge.
+A check that needs the feature on `main` (a required status check, a step in the operator clone, a
+hook installed after the merge) is a **post-merge** check: it sits in the last part and runs once
+the operator has merged. A part that only records a decision (an ADR update) is allowed, last, with static and
 operator checks. Write `04-parts.md` as a table: part, what it delivers, depends on, tool choice
 (`ADR-fixed: <ADR>` or `open`), runnable checks copied from `03-checks.md` and written out in the
 cell. Breaking a plan down often finds it wrong in places: record each correction under
