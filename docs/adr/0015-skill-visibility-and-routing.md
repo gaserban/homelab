@@ -2,6 +2,10 @@
 
 Date: 2026-10-24
 
+Status: Accepted, except the `skillOverrides` sentence in the visibility bullet, the handover
+sentence in the gated-flows bullet, and the consequence "Downloaded skills are not forked to make
+them callable", which are superseded by ADR 0016.
+
 Supersedes one bullet of ADR 0014: "The hl-flow router is the single entry point and calls
 exactly one skill." The rest of 0014 stands.
 
