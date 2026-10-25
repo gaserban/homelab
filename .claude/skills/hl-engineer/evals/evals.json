@@ -1,6 +1,6 @@
 {
   "skill_name": "hl-engineer",
-  "notes": "Fixtures for each eval live in the skill-creator workspace under fixtures/<eval>/ and are copied into .flow/ before a run. Runs are unattended: a gate that closes without an answer counts as Stop, so every eval ends at its stage's gate with a `stopped` progress line. GitHub writes are allowed on #6 only; the close-out eval on #2 carries an operator instruction to write comments to a file instead. With-skill runs share one checkout and one state file, so they run one at a time. Iteration 1 (2026-10-25): plan 9/11 vs 3/11 baseline, breakdown 8/9 vs 5/9, close-out 8/8 vs 8/8 on the first assertion sets. Iteration 2 (2026-10-25, revised skill, the assertion sets below): plan 8/12 vs 2/12, breakdown 10/11 vs 4/11. Stage numbering since iteration 3: 0 intake, 1 prior art, 2 requirements, 3 plan (log in 03-review.md), 4 breakdown, 5 adopt-or-build, 6 publish, 7 close-out. Known harness limits: a frontmatter hook does not register when the skill is read as a file (the bound hook now lives in settings), AskUserQuestion is unavailable to subagents so every gate ends in Stop, and agent definitions appear to load once per session, so start a fresh session after editing .claude/agents. From iteration 3 on, the skill is measured on real runs through docs/agents/hl-engineer-runs.md; these assertions are the checklist a retro grades those runs against. The close-out assertions need rewriting around the protocol before that eval is rerun.",
+  "notes": "Fixtures for each eval live in the skill-creator workspace under fixtures/<eval>/ and are copied into .flow/ before a run. Runs are unattended: a gate that closes without an answer counts as Stop, so every eval ends at its stage's gate with a `stopped` progress line. GitHub writes are allowed on #6 only; the close-out eval on #2 carries an operator instruction to write comments to a file instead. With-skill runs share one checkout and one state file, so they run one at a time. Iteration 1 (2026-10-25): plan 9/11 vs 3/11 baseline, breakdown 8/9 vs 5/9, close-out 8/8 vs 8/8 on the first assertion sets. Iteration 2 (2026-10-25, revised skill, the assertion sets below): plan 8/12 vs 2/12, breakdown 10/11 vs 4/11. Stage numbering since iteration 3: 0 intake, 1 prior art, 2 requirements, 3 plan (log in 03-review.md), 4 breakdown, 5 adopt-or-build, 6 publish, 7 close-out. Known harness limits: a frontmatter hook does not register when the skill is read as a file (the bound hook now lives in settings), AskUserQuestion is unavailable to subagents so every gate ends in Stop, and agent definitions appear to load once per session, so start a fresh session after editing .claude/agents. From iteration 3 on, the skill is measured on real runs through docs/agents/hl-engineer-runs.md; these assertions are the checklist a retro grades those runs against. The close-out assertions need rewriting around the protocol before that eval is rerun. Run #19 (2026-10-25, the first long real run: 17 review rounds, the bound raised eight times) led to these changes, approved by the operator: an experiment rule in prior art and review, checks in 03-checks.md outside the plan cap, a reviewer severity rubric and evidence rule, a convergence rule (all three lenses every round; majors must fall 30% over two rounds or the gate recommends a split), new-surface marking for fixes that add mechanisms, trust-boundary questions in requirements, a free-text intake path, amendments applied at publish, and gate summaries capped. Eval 0 and 3 assertions were updated and eval 4 added to match.",
   "evals": [
     {
       "id": 0,
@@ -11,16 +11,19 @@
       "expectations": [
         ".flow/6/03-plan.md exists and presents at least two options and one recommendation",
         "The recommendation's `Rests on` line names ADR 0003, ADR 0004 and ADR 0012 and cites at least one block of 01-prior-art.md, or the plan says why it deviates from it",
-        "Every check, operator checks included, is one line reading `<command or action> → <expected signal>` with exactly one tag and no rider, and no check refers to another check; the count of exceptions is zero",
+        ".flow/6/03-checks.md exists, numbered and grouped by part; every check in it, operator checks included, is one line reading `<command or action> → <expected signal>` with exactly one tag and no rider, no check refers to another check, and 03-plan.md cites checks by number instead of writing them out; the count of exceptions is zero",
         "The plan copies the issue's Goal and Done when word for word",
         "Round 1 spawned three hl-plan-reviewer agents in one message on Opus with first lines `Lens: Falsifier`, `Lens: Saboteur`, `Lens: Newcomer`",
+        "Every round after the first spawned all three lenses again (not only the ones that failed), and from round 2 on each prompt's third line names the text changed since the last round",
         ".flow/6/03-review.md has a line for every finding of every round, each marked fixed, rebutted or cut, and 03-plan.md carries no review log",
-        "The final 03-plan.md is under 3,000 words",
+        "Each round header in 03-review.md carries its count of blockers and majors; every fix that adds a mechanism (script, hook, wrapper, config layer, guard) is marked `new surface`; and if the count did not fall by at least 30% over two rounds, the next gate summary names the recurring theme and recommends a split or cut",
+        "The final 03-plan.md is under 3,000 words, not counting 03-review.md or 03-checks.md",
         "Either every lens passed on the final revision, or the brief's Open section names the findings the unreviewed last revision addresses",
         "The plan's deletion-safety section states that kro deletes an instance's children, the PVC included, places protection on the instance, the Kustomization's deletionPolicy and a retaining storage class, and applies it in dev, not only in prod",
         ".flow/6.json ends with status awaiting-operator or stopped and a changed updated timestamp, and its review counts equal the launches per lens recorded in the transcript",
         "This run posted exactly one comment on issue #6 (identified by the id in the transcript), starting with `hl-engineer: plan approved` or `hl-engineer: plan stopped`, and a stopped line names `/hl-engineer resume 6`",
-        "No 04-parts.md was written and stage 4 did not start"
+        "No 04-parts.md was written and stage 4 did not start",
+        "Every gate's AskUserQuestion summary is one paragraph of at most about 120 words"
       ]
     },
     {
@@ -73,11 +76,26 @@
         "Every repo or docs lookup ran as Explore on Haiku and every upstream lookup ran through the research skill on Sonnet, as the transcript's spawn records show; no Haiku agent wrote a research note",
         "Each Sonnet research run left docs/research/<topic>.md, and a note about a tool scores it on the adopt-or-build checklist",
         "Each block's For this issue line names what the answer settles or rules out for issue #6; none is generic",
+        "A question whose answer is a tool's behaviour that no source settles was answered by an experiment under $TMPDIR/hl-proto/6/, recorded in a docs/research note, and the experiment's directory is empty afterwards",
         "A question nobody could source is marked unanswered rather than answered from memory",
         "01-prior-art.md is under 2,000 words",
         "This run's checkpoint comment on issue #6 (identified by its id in the transcript) starts with `hl-engineer: prior-art checkpoint`",
         "After the checkpoint the state file reads stage requirements; the run then stopped at the requirements gate with status stopped or awaiting-operator and posted `hl-engineer: requirements stopped` naming `/hl-engineer resume 6`",
         "No 03-plan.md was written and stage 3 did not start"
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "/hl-engineer I want Flux to post deployment notifications to a Matrix room for dev and prod",
+      "state": "no state file; no issue exists for the request",
+      "expected_output": "The conductor drafts an issue in the four-heading template to .flow/draft-<slug>.md, shows the full text in the conversation, asks the operator to confirm, and (unattended, the question closes without an answer) stops without creating an issue or a state file.",
+      "files": [],
+      "expectations": [
+        "A draft exists at .flow/draft-<slug>.md with the headings `## Goal`, `## Done when`, `## Out of scope` and `## Depends on`, spelled exactly",
+        "The conversation shows the draft's full text, not only its path",
+        "The conductor asked the operator to confirm before creating anything",
+        "No issue was created and no .flow/<n>.json was written, because the confirmation never came",
+        "The Done when items are observable checks, not tasks"
       ]
     }
   ]

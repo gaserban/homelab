@@ -30,22 +30,38 @@ block or says why it deviates.
 ```markdown
 ## <question a practitioner would have answered>
 - Established solution: <what is commonly run or done, in one or two sentences>
-- Source: <docs/research/<topic>.md | ADR <nnnn> | <upstream URL>, dated>
+- Source: <docs/research/<topic>.md | ADR <nnnn> | <upstream URL>, dated | experiment, recorded in docs/research/<topic>.md>
 - For this issue: <what it settles, or what it rules out>
-- Agent: <haiku lookup | sonnet research>
+- Agent: <haiku lookup | sonnet research | conductor experiment>
+```
+
+## Checks file
+
+`03-checks.md`, written with the plan and revised with it; outside the plan's word cap. Numbered
+across the whole file so the plan and the review log can cite a check by number; grouped by part.
+Each line follows the rule in SKILL.md, "Checks".
+
+```markdown
+# Checks for #<n>
+
+## Part <k>: <name>
+<m>. <command or action> → <expected signal> (static | dev | operator)
 ```
 
 ## Review log
 
 `03-review.md`, one file for the whole loop, so the plan brief stays short and the history stays
 whole. Every finding from every round has a line, including the ones that were cut from scope.
+Each round's header carries the count of blockers and majors, which the convergence rule in
+SKILL.md (stage 3, step 3) reads.
 
 ```markdown
 # Review log for #<n>
 
 ## Round <r>
-Brief as reviewed: <words> words, <bytes> bytes.
-- <lens> <k> [blocker|major|minor]: <finding> → fixed: <what replaced what> | rebutted: <why> | cut: <moved where>
+Brief as reviewed: <words> words. Blockers and majors: <count>.
+- <lens> <k> [blocker|major|minor]: <finding> → fixed: <what replaced what> | rebutted: <why, with the source or the experiment> | cut: <moved where>
+- <lens> <k> [major]: <finding> → fixed (new surface): <the mechanism the fix adds>
 ```
 
 ## Plan comment
@@ -67,8 +83,8 @@ line numbers that go stale), with acceptance criteria and a scope boundary, as t
 | 1 | <name> | <observable result on dev> | nothing | <tool, ADR or verdict link> |
 
 ### Done when, per part
-Each check is runnable: `command → expected signal (static | dev | operator)`. `to-tickets` copies
-them into each ticket's `## Done when`, and `tdd` tests at them.
+Each check is runnable: `command → expected signal (static | dev | operator)`, copied from
+`04-parts.md`. `to-tickets` copies them into each ticket's `## Done when`, and `tdd` tests at them.
 
 1. `<command>` → `<expected signal>` (static)
 2. `<command>` → `<expected signal>` (dev)
@@ -97,7 +113,8 @@ A part whose tool an ADR already fixes cites the ADR in place of a verdict.
 
 `docs/agents/hl-engineer-runs.md`, tracked in git, one row per gate, appended after the operator
 answers. Minutes count from the state file's `started`. Findings are per round, as `r1/r2/r3`.
-Friction is the operator's words when they chose Revise or Stop, or `-`.
+Friction is the operator's words when they chose Revise or Stop, or `-`. When the operator raises
+the review bound, the friction cell also says what they expect the extra rounds to change.
 
 ```markdown
 | Date | Issue | Stage | Answer | Rounds F/S/N | Findings | Plan words | Amendments | Minutes | Friction |
