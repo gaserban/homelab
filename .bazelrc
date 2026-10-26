@@ -1,0 +1,11 @@
+# A stale MODULE.bazel.lock fails the command instead of being rewritten mid-commit;
+# `bazel mod deps --lockfile_mode=update` refreshes it.
+common --lockfile_mode=error
+
+# UI-only config for tool runs (`bazel run --config=tool @multitool//tools/<tool>:cwd -- ...`), so
+# they share every build flag and keep the analysis cache.
+common:tool --ui_event_filters=-info --noshow_progress --show_result=0
+
+# Per-user settings (output root, caches, run environment): untracked, absolute paths (ADR 0019).
+# Keep last.
+try-import %workspace%/user.bazelrc

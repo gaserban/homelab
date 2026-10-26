@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# tools/ci-bazel-test: run `bazel test //...`. Bazel's exit 4 ("no test targets were found") passes
+# only while the repository has no test target; any other failure fails.
+set -uo pipefail
+cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." || exit 1
+
+rc=0
+bazel test //... || rc=$?
+if (( rc == 4 )); then
+  tests=$(bazel query 'tests(//...)') || exit "$rc"
+  [[ -z "$tests" ]] && rc=0
+fi
+exit "$rc"

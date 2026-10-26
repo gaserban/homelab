@@ -1,0 +1,137 @@
+# Repo checks on amd64 and arm64 (ADR 0019): on a pull request, a gitleaks scan of its commits from
+# main's tree before any of its code runs; then ./setup (twice, unchanged), prek over every file, and
+# `bazel test //...`. Required on main. Claude drafts changes here; the operator commits them (Claude's
+# credential never holds the Workflows permission).
+name: checks
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  checks:
+    name: checks (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      # Every per-runner value in one place. gitleaks matches tools/multitool.lock.json; bazelisk
+      # matches ./setup's pin (a bump changes setup, this file and docs/operator-setup.md in one PR).
+      # The cache key's prefix covers the arch and both locks; each run's own key adds the commit.
+      - name: pins and cache key for this runner
+        id: pins
+        run: |
+          case "$RUNNER_ARCH" in
+            X64)
+              gitleaks_asset=linux_x64 gitleaks_sha256=551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
+              bazelisk_arch=amd64 bazelisk_sha256=a248ae2b2b62b5baebb748f6fba7203bff1a27e5d01b55399a8406744cb539e8 ;;
+            ARM64)
+              gitleaks_asset=linux_arm64 gitleaks_sha256=e4a487ee7ccd7d3a7f7ec08657610aa3606637dab924210b3aee62570fb4b080
+              bazelisk_arch=arm64 bazelisk_sha256=b2bcc040c213b44586b121bda6d983c35df121b917c3a7a66fb16f2fa0df1a4f ;;
+            *) echo "no pins for $RUNNER_ARCH" >&2; exit 1 ;;
+          esac
+          {
+            echo "gitleaks_url=https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_$gitleaks_asset.tar.gz"
+            echo "gitleaks_sha256=$gitleaks_sha256"
+            echo "bazelisk_url=https://github.com/bazelbuild/bazelisk/releases/download/v1.30.0/bazelisk-linux-$bazelisk_arch"
+            echo "bazelisk_sha256=$bazelisk_sha256"
+            echo "cache_prefix=bazel-disk-$RUNNER_ARCH-${{ hashFiles('MODULE.bazel.lock', 'tools/multitool.lock.json') }}-"
+          } >> "$GITHUB_OUTPUT"
+
+      # Before any of the pull request's code runs. The binary is pinned here, not by the PR's lock;
+      # scanning from main's worktree applies main's .gitleaksignore, .gitleaks.toml and
+      # .gitattributes, so a PR cannot silence a finding with its own; inline allow markers are
+      # ignored; first-parent diffs scan what a merge brings in.
+      - name: gitleaks over the pull request's commits
+        if: github.event_name == 'pull_request'
+        env:
+          URL: ${{ steps.pins.outputs.gitleaks_url }}
+          SHA256: ${{ steps.pins.outputs.gitleaks_sha256 }}
+        run: |
+          curl -fsSLo "$RUNNER_TEMP/gitleaks.tar.gz" "$URL"
+          echo "$SHA256  $RUNNER_TEMP/gitleaks.tar.gz" | sha256sum -c -
+          mkdir "$RUNNER_TEMP/gitleaks"
+          tar -xzf "$RUNNER_TEMP/gitleaks.tar.gz" -C "$RUNNER_TEMP/gitleaks" gitleaks
+          git worktree add --detach "$RUNNER_TEMP/base" origin/main
+          "$RUNNER_TEMP/gitleaks/gitleaks" git -v --redact \
+            --log-opts="--diff-merges=first-parent origin/main..$(git rev-parse HEAD)" \
+            --ignore-gitleaks-allow "$RUNNER_TEMP/base"
+          git worktree remove --force "$RUNNER_TEMP/base"
+
+      - name: bazelisk v1.30.0 as bazel
+        env:
+          URL: ${{ steps.pins.outputs.bazelisk_url }}
+          SHA256: ${{ steps.pins.outputs.bazelisk_sha256 }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/bin"
+          curl -fsSLo "$RUNNER_TEMP/bin/bazel" "$URL"
+          echo "$SHA256  $RUNNER_TEMP/bin/bazel" | sha256sum -c -
+          chmod 755 "$RUNNER_TEMP/bin/bazel"
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+
+      # Restored on every run, saved only on a push to main, so a PR never writes the cache.
+      - name: restore the Bazel disk cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/bazel-disk
+          key: ${{ steps.pins.outputs.cache_prefix }}${{ github.sha }}
+          restore-keys: ${{ steps.pins.outputs.cache_prefix }}
+
+      # user.bazelrc is untracked and rc files expand no variables, so the shell writes the path.
+      - name: disk cache in user.bazelrc
+        run: echo "common --disk_cache=$RUNNER_TEMP/bazel-disk" >> user.bazelrc
+
+      - name: Podman and bubblewrap
+        run: sudo apt-get update && sudo apt-get install -y bubblewrap podman
+
+      - name: ./setup
+        run: ./setup
+
+      # A second ./setup changes no tool and no file: the hashes of bazelisk and of every tool in
+      # tools/multitool.lock.json are the same before and after it, and the tree stays clean.
+      - name: ./setup again changes nothing
+        run: |
+          mapfile -t tools < <(jq -r 'keys[] | select(startswith("$") | not) | "@multitool//tools/" + .' tools/multitool.lock.json)
+          bazel build "${tools[@]}"
+          execution_root=$(bazel info execution_root)
+          tool_hashes() {
+            bazel cquery --output=files "set(${tools[*]})" | sed "s|^|$execution_root/|" | xargs readlink -f \
+              | xargs sha256sum "$(readlink -f "$(command -v bazel)")"
+          }
+          tool_hashes > "$RUNNER_TEMP/before"
+          ./setup
+          tool_hashes | diff "$RUNNER_TEMP/before" -
+          if [ "$(wc -l < "$RUNNER_TEMP/before")" -ne $(( ${#tools[@]} + 1 )) ]; then
+            echo "expected bazelisk and ${#tools[@]} tools in the hash list:" >&2; cat "$RUNNER_TEMP/before" >&2; exit 1
+          fi
+          changed=$(git status --porcelain)
+          if [ -n "$changed" ]; then printf 'setup changed the working tree:\n%s\n' "$changed" >&2; exit 1; fi
+
+      - name: prek over all files
+        run: bazel run --config=tool @multitool//tools/prek:cwd -- run --all-files --config .pre-commit-config.yaml
+
+      - name: bazel test //...
+        run: tools/ci-bazel-test
+
+      - name: save the Bazel disk cache
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/bazel-disk
+          key: ${{ steps.pins.outputs.cache_prefix }}${{ github.sha }}

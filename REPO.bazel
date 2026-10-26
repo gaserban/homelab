@@ -1,0 +1,9 @@
+# Directories Bazel must not see: runtime state, flow notes, downloaded skills, Claude's worktrees and
+# Bazel's own output symlinks (ADR 0019).
+ignore_directories([
+    ".state",
+    ".flow",
+    ".claude/skills",
+    ".claude/worktrees",
+    "bazel-*",
+])
