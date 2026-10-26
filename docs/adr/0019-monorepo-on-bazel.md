@@ -53,7 +53,7 @@ provider-backed command was run.
   elsewhere is a reviewed change like any other.
 - Nothing Claude can change without review runs outside the sandbox, with three named exceptions:
   the App token helpers that a hook and the operator's PATH run from the worktree (#20 removes
-  them); the root wizard, which the operator ran from the worktree (#19 moves it); and CI, which
+  them); the root wizard, which the operator ran from the worktree and, since #19, runs from their own clone; and CI, which
   runs a pull request's code on ephemeral GitHub runners with a read-only token, no secrets and no
   persisted credentials. Claude's checkout is Claude's alone (the previous bullet lists what the operator does not do
   there). The operator works in their own clone from GitHub, outside
@@ -158,7 +158,7 @@ provider-backed command was run.
 | `.claude/hooks/test.sh` | kept | the hook suite, run by prek's `hook-suite` entry; tests bash hooks by feeding them payloads |
 | `.claude/hooks/token-refresh.sh` | kept until #20 | Claude Code hook that mints the App token outside the sandbox; #20 removes it with the App token scripts, for `gh` and a machine account |
 | `setup` | kept (new, #25) | glue that must run before Bazel: checks Podman, bubblewrap and the bazelisk pin, then `bazel fetch` |
-| `tools/ci-bazel-test` | kept (new, #26) | CI glue around `bazel test //...` that accepts exit 4 only while no test target exists |
+| `tools/ci-bazel-test` | kept (new, #25) | CI glue around `bazel test //...` that accepts exit 4 only while no test target exists |
 | `tools/gh` | kept until #20, named exception | wraps `/usr/bin/gh` with the App token; #20 removes it, for `gh` itself logged in as a machine account |
 | `tools/gh-app-token` | kept until #20, named exception | mints and caches the App installation token (openssl, curl); #20 removes it |
 | `tools/git-credential-homelab-app` | kept until #20, named exception | git credential helper serving the App token; #20 removes it, for `gh auth setup-git` |
