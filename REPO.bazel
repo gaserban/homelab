@@ -1,0 +1,1 @@
+ignore_directories([".state", ".flow", ".claude/skills", ".claude/worktrees", "bazel-*"])
