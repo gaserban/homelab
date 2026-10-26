@@ -1,0 +1,20 @@
+load("@rules_python//python:defs.bzl", "py_library", "py_test")
+load("@rules_uv//uv:pip.bzl", "pip_compile")
+
+pip_compile(
+    name = "requirements",
+    requirements_in = "pyproject.toml",
+    requirements_txt = "requirements.txt",
+)
+
+py_library(
+    name = "mod",
+    srcs = ["mod.py"],
+    deps = ["@pypi//packaging"],
+)
+
+py_test(
+    name = "mod_test",
+    srcs = ["mod_test.py"],
+    deps = [":mod"],
+)
