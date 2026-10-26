@@ -14,9 +14,20 @@ Claude Desktop WSL session. Decisions behind each step: ADR 0001, 0005, 0013, 00
    - bypass list: repository admin, mode "for pull requests only".
 4. Settings, Developer settings, GitHub Apps: create an App with Contents read and write, Pull
    requests read and write, Issues read and write, Metadata read. Install it on `homelab` only.
-   Download its private key. Add Workflows read and write only when the repo gets its first
-   workflow.
+   Download its private key. Never grant Workflows; the operator adds `.github/workflows/` changes.
 5. Create a read-only deploy key for the cluster later (the Flux source); not needed until prod.
+6. CI (`.github/workflows/checks.yml`, ADR 0019). Workflows run outside every sandbox, so Claude
+   drafts a workflow change in a PR comment and you commit it in GitHub's web editor on that PR's
+   branch (Add file, Create new file, or the file's pencil; commit directly to the branch). Claude
+   cannot push it: GitHub refuses a push that touches `.github/workflows/` without Workflows.
+   In Settings, Actions, General:
+   - Approval for running fork pull request workflows from contributors: "Require approval for all
+     external contributors";
+   - Workflow permissions: "Read repository contents and packages permissions", and "Allow GitHub
+     Actions to create and approve pull requests" unchecked.
+
+   Once the workflow is on `main`, in the `main` ruleset (step 3) turn on "Require status checks to
+   pass" and add `checks (ubuntu-24.04)` and `checks (ubuntu-24.04-arm)`, source GitHub Actions.
 
 ## 2. Windows
 
