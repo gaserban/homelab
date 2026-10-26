@@ -1,0 +1,111 @@
+# Repo checks on amd64 and arm64 (ADR 0019): on a pull request, a gitleaks scan of its commits from
+# main's tree before any of its code runs; then ./setup (twice, unchanged), prek over every file, and
+# `bazel test //...`. Required on main. Claude drafts changes here; the operator commits them (Claude's
+# credential never holds the Workflows permission).
+name: checks
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  checks:
+    name: checks (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      # Before any of the pull request's code runs. The binary is pinned here, not by the PR's lock;
+      # scanning from main's worktree applies main's .gitleaksignore, .gitleaks.toml and
+      # .gitattributes, so a PR cannot silence a finding with its own; inline allow markers are
+      # ignored; first-parent diffs scan what a merge brings in. Same version as
+      # tools/multitool.lock.json.
+      - name: gitleaks over the pull request's commits
+        if: github.event_name == 'pull_request'
+        run: |
+          case "$RUNNER_ARCH" in
+            X64) asset=linux_x64 sum=551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb ;;
+            ARM64) asset=linux_arm64 sum=e4a487ee7ccd7d3a7f7ec08657610aa3606637dab924210b3aee62570fb4b080 ;;
+            *) echo "no gitleaks pin for $RUNNER_ARCH" >&2; exit 1 ;;
+          esac
+          curl -fsSLo "$RUNNER_TEMP/gitleaks.tar.gz" "https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_$asset.tar.gz"
+          echo "$sum  $RUNNER_TEMP/gitleaks.tar.gz" | sha256sum -c -
+          mkdir "$RUNNER_TEMP/gitleaks"
+          tar -xzf "$RUNNER_TEMP/gitleaks.tar.gz" -C "$RUNNER_TEMP/gitleaks" gitleaks
+          git worktree add --detach "$RUNNER_TEMP/base" origin/main
+          "$RUNNER_TEMP/gitleaks/gitleaks" git -v --redact \
+            --log-opts="--diff-merges=first-parent origin/main..$(git rev-parse HEAD)" \
+            --ignore-gitleaks-allow "$RUNNER_TEMP/base"
+          git worktree remove --force "$RUNNER_TEMP/base"
+
+      # bazelisk at ./setup's pin (a bump changes setup and this file in one PR).
+      - name: bazelisk v1.30.0 as bazel
+        run: |
+          case "$RUNNER_ARCH" in
+            X64) arch=amd64 sum=a248ae2b2b62b5baebb748f6fba7203bff1a27e5d01b55399a8406744cb539e8 ;;
+            ARM64) arch=arm64 sum=b2bcc040c213b44586b121bda6d983c35df121b917c3a7a66fb16f2fa0df1a4f ;;
+            *) echo "no bazelisk pin for $RUNNER_ARCH" >&2; exit 1 ;;
+          esac
+          mkdir -p "$RUNNER_TEMP/bin"
+          curl -fsSLo "$RUNNER_TEMP/bin/bazel" "https://github.com/bazelbuild/bazelisk/releases/download/v1.30.0/bazelisk-linux-$arch"
+          echo "$sum  $RUNNER_TEMP/bin/bazel" | sha256sum -c -
+          chmod 755 "$RUNNER_TEMP/bin/bazel"
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+
+      # Restored on every run, saved only on a push to main, so a PR never writes the cache.
+      - name: restore the Bazel disk cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/bazel-disk
+          key: bazel-disk-${{ runner.arch }}-${{ hashFiles('MODULE.bazel.lock', 'tools/multitool.lock.json') }}-${{ github.sha }}
+          restore-keys: |
+            bazel-disk-${{ runner.arch }}-${{ hashFiles('MODULE.bazel.lock', 'tools/multitool.lock.json') }}-
+
+      # user.bazelrc is untracked and rc files expand no variables, so the shell writes the path.
+      - name: disk cache in user.bazelrc
+        run: echo "common --disk_cache=$RUNNER_TEMP/bazel-disk" >> user.bazelrc
+
+      - name: Podman and bubblewrap
+        run: sudo apt-get update && sudo apt-get install -y bubblewrap podman
+
+      - name: ./setup
+        run: ./setup
+
+      # A second ./setup changes no tool (bazelisk and the eight locked binaries) and no file.
+      - name: ./setup again changes nothing
+        run: |
+          S=$RUNNER_TEMP
+          # $L and the cquery output are label and path lists, split on purpose.
+          # shellcheck disable=SC2046,SC2086
+          L="@multitool//tools/shellcheck @multitool//tools/gitleaks @multitool//tools/buildifier @multitool//tools/kubectl @multitool//tools/kind @multitool//tools/flux @multitool//tools/helm @multitool//tools/prek" && bazel build $L && h() { sha256sum "$(readlink -f "$(command -v bazel)")" $(bazel cquery --output=files "set($L)" | sed "s|^|$(bazel info execution_root)/|" | xargs readlink -f); } && h > "$S/h1" && ./setup && h | diff "$S/h1" - && test "$(wc -l < "$S/h1")" = 9 || exit 1
+          status=$(git status --porcelain)
+          if [ -n "$status" ]; then printf 'setup changed the working tree:\n%s\n' "$status" >&2; exit 1; fi
+
+      - name: prek over all files
+        run: bazel run --config=tool @multitool//tools/prek:cwd -- run --all-files --config .pre-commit-config.yaml
+
+      - name: bazel test //...
+        run: tools/ci-bazel-test
+
+      - name: save the Bazel disk cache
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/bazel-disk
+          key: bazel-disk-${{ runner.arch }}-${{ hashFiles('MODULE.bazel.lock', 'tools/multitool.lock.json') }}-${{ github.sha }}
