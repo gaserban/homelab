@@ -1,0 +1,10 @@
+"""The homelab monorepo (ADR 0019). Each language is wired when its first package lands."""
+
+module(name = "homelab")
+
+# Single-binary tools, run as `bazel run --config=tool @multitool//tools/<tool>:cwd -- <args>`.
+bazel_dep(name = "rules_multitool", version = "1.11.1")
+
+multitool = use_extension("@rules_multitool//multitool:extension.bzl", "multitool")
+multitool.hub(lockfile = "//tools:multitool.lock.json")
+use_repo(multitool, "multitool")

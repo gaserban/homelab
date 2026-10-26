@@ -8,7 +8,17 @@
 # one SSH connection to the hl-tunnel container (tools/sandbox-tunnel), which carries end-of-input
 # in-band.
 # If the tunnel is down, it is rebuilt and started over a plain bridge to the API first.
+# kind, kubectl, flux and helm are the locked tools (tools/multitool.lock.json, ADR 0019): they run
+# as tool runs, `bazel run --config=tool @multitool//tools/<tool>:cwd`, in the caller's directory.
 set -euo pipefail
+
+# A tool run needs the caller's checkout; refuse before the tunnel or .state is touched.
+tool=""
+case "${1:-}" in
+  kind|kubectl|flux|helm)
+    git rev-parse --show-toplevel >/dev/null 2>&1 || { echo "hl-runtime: run from inside a git checkout" >&2; exit 1; }
+    tool=$1 ;;
+esac
 
 API_PORT=8888
 TUNNEL_PORT=5001
@@ -87,4 +97,8 @@ if ! reachable "$API_PORT"; then
   fi
 fi
 
-"$@"
+if [[ -n "$tool" ]]; then
+  bazel run --config=tool "@multitool//tools/$tool:cwd" -- "${@:2}"
+else
+  "$@"
+fi

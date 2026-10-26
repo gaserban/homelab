@@ -1,0 +1,157 @@
+{
+  "$schema": "https://raw.githubusercontent.com/theoremlp/rules_multitool/main/lockfile.schema.json",
+  "buildifier": {
+    "binaries": [
+      {
+        "kind": "file",
+        "url": "https://github.com/bazelbuild/buildtools/releases/download/v10.1.0/buildifier-linux-amd64",
+        "sha256": "31b6a8aa1e5c746696788f428729701770ad91925873d8256cb885c60e12c77e",
+        "os": "linux",
+        "cpu": "x86_64"
+      },
+      {
+        "kind": "file",
+        "url": "https://github.com/bazelbuild/buildtools/releases/download/v10.1.0/buildifier-linux-arm64",
+        "sha256": "38d2ed845f560b4a16ddee41de906508a95f8dc85b04e0851b0a71e3a70d3890",
+        "os": "linux",
+        "cpu": "arm64"
+      }
+    ]
+  },
+  "flux": {
+    "binaries": [
+      {
+        "kind": "archive",
+        "url": "https://github.com/fluxcd/flux2/releases/download/v2.9.6/flux_2.9.6_linux_amd64.tar.gz",
+        "file": "flux",
+        "sha256": "b4d22673e9246cbd628881f1a9ef3b090085dced291e42d804555cee8e8d42c5",
+        "os": "linux",
+        "cpu": "x86_64"
+      },
+      {
+        "kind": "archive",
+        "url": "https://github.com/fluxcd/flux2/releases/download/v2.9.6/flux_2.9.6_linux_arm64.tar.gz",
+        "file": "flux",
+        "sha256": "6663c154755b732f43dc993d72321f71c2fc1ff0bcb94b2696e0a8638fa562b4",
+        "os": "linux",
+        "cpu": "arm64"
+      }
+    ]
+  },
+  "gitleaks": {
+    "binaries": [
+      {
+        "kind": "archive",
+        "url": "https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz",
+        "file": "gitleaks",
+        "sha256": "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb",
+        "os": "linux",
+        "cpu": "x86_64"
+      },
+      {
+        "kind": "archive",
+        "url": "https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_arm64.tar.gz",
+        "file": "gitleaks",
+        "sha256": "e4a487ee7ccd7d3a7f7ec08657610aa3606637dab924210b3aee62570fb4b080",
+        "os": "linux",
+        "cpu": "arm64"
+      }
+    ]
+  },
+  "helm": {
+    "binaries": [
+      {
+        "kind": "archive",
+        "url": "https://get.helm.sh/helm-v4.3.1-linux-amd64.tar.gz",
+        "file": "linux-amd64/helm",
+        "sha256": "0403a88ae20913d11b10a2467b50087721fea7581736da6b9d3992f5357fe54b",
+        "os": "linux",
+        "cpu": "x86_64"
+      },
+      {
+        "kind": "archive",
+        "url": "https://get.helm.sh/helm-v4.3.1-linux-arm64.tar.gz",
+        "file": "linux-arm64/helm",
+        "sha256": "8cf8f66ecbc252ac8f7f06cca68aba88508ddfde3a6a34feb1678ad1694b4f88",
+        "os": "linux",
+        "cpu": "arm64"
+      }
+    ]
+  },
+  "kind": {
+    "binaries": [
+      {
+        "kind": "file",
+        "url": "https://github.com/kubernetes-sigs/kind/releases/download/v0.33.0/kind-linux-amd64",
+        "sha256": "aee6151561422756b764a4ae28e7f44cda5af5a9eead3cc9985112b1de8d8e0d",
+        "os": "linux",
+        "cpu": "x86_64"
+      },
+      {
+        "kind": "file",
+        "url": "https://github.com/kubernetes-sigs/kind/releases/download/v0.33.0/kind-linux-arm64",
+        "sha256": "20022bee6cfcd5086cb7234d218e3454e6090022f2a8f55d1fa7fcf42c3867a2",
+        "os": "linux",
+        "cpu": "arm64"
+      }
+    ]
+  },
+  "kubectl": {
+    "binaries": [
+      {
+        "kind": "file",
+        "url": "https://dl.k8s.io/release/v1.37.1/bin/linux/amd64/kubectl",
+        "sha256": "65691ff77eb6fa44c908b77a1082c9f092c3b9733b5cefabec0d1104890e21a8",
+        "os": "linux",
+        "cpu": "x86_64"
+      },
+      {
+        "kind": "file",
+        "url": "https://dl.k8s.io/release/v1.37.1/bin/linux/arm64/kubectl",
+        "sha256": "ff749f4b78d9c4f1ec87307df9b50119ed819e2094aa9810cb9acffc3286c8c7",
+        "os": "linux",
+        "cpu": "arm64"
+      }
+    ]
+  },
+  "prek": {
+    "binaries": [
+      {
+        "kind": "archive",
+        "url": "https://github.com/j178/prek/releases/download/v0.5.7/prek-x86_64-unknown-linux-musl.tar.gz",
+        "file": "prek-x86_64-unknown-linux-musl/prek",
+        "sha256": "25d6a0316125127aed3ad7010128884d7e7243c4ac06f084218b98dc20020ca9",
+        "os": "linux",
+        "cpu": "x86_64"
+      },
+      {
+        "kind": "archive",
+        "url": "https://github.com/j178/prek/releases/download/v0.5.7/prek-aarch64-unknown-linux-musl.tar.gz",
+        "file": "prek-aarch64-unknown-linux-musl/prek",
+        "sha256": "022ddbaef649d83ab7e0cfde13400612b896b04cce338623205525560d47bcf6",
+        "os": "linux",
+        "cpu": "arm64"
+      }
+    ]
+  },
+  "shellcheck": {
+    "binaries": [
+      {
+        "kind": "archive",
+        "url": "https://github.com/koalaman/shellcheck/releases/download/v0.11.0/shellcheck-v0.11.0.linux.x86_64.tar.gz",
+        "file": "shellcheck-v0.11.0/shellcheck",
+        "sha256": "b7af85e41cc99489dcc21d66c6d5f3685138f06d34651e6d34b42ec6d54fe6f6",
+        "os": "linux",
+        "cpu": "x86_64"
+      },
+      {
+        "kind": "archive",
+        "url": "https://github.com/koalaman/shellcheck/releases/download/v0.11.0/shellcheck-v0.11.0.linux.aarch64.tar.gz",
+        "file": "shellcheck-v0.11.0/shellcheck",
+        "sha256": "68a8133197a50beb8803f8d42f9908d1af1c5540d4bb05fdfca8c1fa47decefc",
+        "os": "linux",
+        "cpu": "arm64"
+      }
+    ]
+  }
+}
