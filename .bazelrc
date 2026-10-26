@@ -2,5 +2,11 @@
 # they share every build flag and keep the analysis cache.
 common:tool --ui_event_filters=-info --noshow_progress --show_result=0
 
+# Aspect rulesets report usage to Aspect unless told not to (rules_js README, "Telemetry").
+common --repo_env=DO_NOT_TRACK=1
+
+# TypeScript: tsc type-checks and emits the .js (rules_ts docs/transpiler.md).
+common --@aspect_rules_ts//ts:default_to_tsc_transpiler
+
 # Per-user settings (output root, caches, run environment): untracked, absolute paths. Keep last.
 try-import %workspace%/user.bazelrc

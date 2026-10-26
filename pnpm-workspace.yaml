@@ -1,0 +1,6 @@
+packages:
+  - proto/web
+# rules_js lays node_modules out unhoisted; keep pnpm's own layout the same (rules_js docs/pnpm.md).
+hoist: false
+# No package runs install scripts (rules_js turns these into lifecycle hook actions).
+allowBuilds: {}

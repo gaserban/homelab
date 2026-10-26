@@ -1,1 +1,1 @@
-ignore_directories([".state", ".flow", ".claude/skills", ".claude/worktrees", "bazel-*"])
+ignore_directories([".state", ".flow", ".claude/skills", ".claude/worktrees", "bazel-*", "**/node_modules"])
