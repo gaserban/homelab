@@ -20,10 +20,10 @@ arch=$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')
 want=${BAZELISK_SHA256[$arch]:-}
 bazel=$(command -v bazel || true)
 if [[ -z "$want" || -z "$bazel" || "$(sha256sum "$(readlink -f "$bazel")" | cut -d' ' -f1)" != "$want" ]]; then
-  echo "setup: bazel on PATH is not bazelisk $BAZELISK_VERSION; install it as bazel from" >&2
-  echo "  https://github.com/bazelbuild/bazelisk/releases/download/$BAZELISK_VERSION/bazelisk-linux-$arch (SHA-256 ${want:-none for $arch})" >&2
+  echo "setup: bazel on PATH is not bazelisk $BAZELISK_VERSION; install it as bazel from https://github.com/bazelbuild/bazelisk/releases/download/$BAZELISK_VERSION/bazelisk-linux-$arch (SHA-256 ${want:-none for $arch})" >&2
   exit 1
 fi
 
 cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")"
 bazel fetch //... @multitool//tools/...   # //... alone fetches no tool
+bazel shutdown   # the fetch also configured each tool for exec (via :cwd); a new server forgets it
