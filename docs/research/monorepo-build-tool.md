@@ -144,6 +144,190 @@ condition for Bazel. A scratch workspace, Bazel 9.3.1 through bazelisk v1.30.0:
 This removes the claim in the short answer that the sandbox "removes the reason to pay for Bazel":
 the reason moves from the sandbox to the toolchains, and those work here.
 
+## Prototype results (#24, 2026-10-26)
+
+The spike for #19 part 1, run by Claude in its checkout (the linked worktree
+`.claude/worktrees/spike-24` on `spike/bazel-polyglot`) and in a scratch clone of the pushed branch
+under `$TMPDIR/hl-proto/19/clone`, all inside the Claude sandbox on WSL2 (x86_64). The code is kept
+under the tag `spike-bazel-polyglot` (commit `107c424`); the branch is never merged. Every check
+below is the command from `03-checks.md`, run as written, one Bash call per step. Check 18 ran first,
+before any other `bazel` call, and again at the end.
+
+| # | Check | What it printed | Result |
+| --- | --- | --- | --- |
+| 1 | `bazel test //proto/...` without `tf:lint` and `tf:validate` | `cc:hello_test`, `go:hello_test`, `py:mod_test`, `py:requirements_test`, `tf:format`, `web:component_test` all `PASSED`; exit 0 | passed |
+| 2 | `deps(//proto/web:component_test)` counted for `node_modules/react` | `4` | passed |
+| 3 | `deps(//proto/py:mod_test)` counted for `//packaging` | `3` | passed |
+| 4 | Go `hello` built for `@zig_sdk//platform:linux_arm64`, ELF machine bytes | ` b7 00` | passed |
+| 5 | C++ `hello` built for `@zig_sdk//platform:linux_arm64`, ELF machine bytes | ` b7 00` | passed |
+| 6 | `bazel run //:gazelle.check` on the committed tree | `exit=0` | passed |
+| 7 | `gazelle.check` after adding `proto/go/extra.go` | a diff adding `extra.go` to `hello_lib`'s `srcs`, then `exit=1` | passed |
+| 8 | kubectl as a tool run, `version --client` | `Client Version: v1.37.1` | passed |
+| 9 | prek as a tool run, `--version` | `prek 0.5.7` (the lock's version) | passed |
+| 10 | node, pnpm, python, uv, tofu `--version`; go `version` | `v26.12.1`, `12.15.0`, `Python 3.14.4`, `uv 0.13.5`, `OpenTofu v1.13.2`, `go version go1.27.3 linux/amd64`; no `FAIL` | passed |
+| 11 | scratch clone: commit `tools/scratch` holding `cd /tmp` | shellcheck `Failed` with `SC2164`, then `exit=1` | passed |
+| 12 | scratch clone: push `HEAD` to a new branch of a local bare repo | gitleaks `Passed`, then `exit=0` | passed |
+| 13 | scratch clone: push a commit holding a fake AWS key to two new branches | gitleaks `Failed` with `RuleID: aws-access-token` for each ref, then `exit=1` | passed |
+| 14 | scratch clone: push a new branch, then delete it | gitleaks `Passed` on the push, the deletion skipped, then `exit=0` | passed |
+| 15 | `git check-ignore -v user.bazelrc` | `.gitignore:34:/user.bazelrc`, then the path | passed |
+| 16 | `bazel info output_base` under the rc's `--output_user_root` | `same` | passed |
+| 17 | `<C>/prek` not empty | `used` | passed |
+| 18 | installed `bazel` against GitHub's digest for v1.30.0's `bazelisk-linux-amd64`; `bazel version` | `match`, then `Bazelisk version: v1.30.0` (first and last call) | passed |
+| 19 | `$TMPDIR/hl-proto/19` empty after `bazel clean --expunge` and the `rm` | `empty` | passed |
+| 20 | `.state/` listing against `state-before-1.txt` | `same` | passed |
+
+The run labels check 10 uses, for part 2 and later: `@nodejs//:node`, `@pnpm//:pnpm`,
+`@rules_python//python/bin:python`, `@multitool//tools/uv:cwd`, `@tf_toolchains//:tofu` and
+`@rules_go//go`.
+
+### Versions
+
+- Bazel 9.3.1 (`.bazelversion`), started by bazelisk v1.30.0. GitHub's SHA-256 digests for the
+  v1.30.0 assets, for `setup`'s pins:
+  - `bazelisk-linux-amd64`: `a248ae2b2b62b5baebb748f6fba7203bff1a27e5d01b55399a8406744cb539e8`
+    (the operator's install on this workstation matches it)
+  - `bazelisk-linux-arm64`: `b2bcc040c213b44586b121bda6d983c35df121b917c3a7a66fb16f2fa0df1a4f`
+- Modules (BCR, latest on 2026-10-26): platforms 1.1.0, rules_cc 0.2.27, hermetic_cc_toolchain 4.3.0
+  (Zig 0.15.2), rules_go 0.65.0, rules_multitool 1.11.1, rules_python 2.4.5, rules_uv 0.89.2,
+  rules_nodejs 6.7.7, aspect_rules_js 3.5.2, aspect_rules_ts 3.10.1, rules_tf 0.0.10,
+  aspect_gazelle_prebuilt 0.0.28.
+- Toolchains: Go 1.27.3 (both Linux SDK hashes pinned in `MODULE.bazel`), Python 3.14.4
+  (rules_python's 3.14), Node.js 26.12.1, pnpm 12.15.0 (`packageManager` with its sha512),
+  TypeScript 7.0.2 (rules_ts runs the native compiler), React and react-dom 19.3.1, OpenTofu 1.13.2,
+  tflint 0.65.0, terraform-docs 0.24.0, `packaging` 26.3 (from PyPI, hashed by uv).
+- Multitool lock (`tools/multitool.lock.json`, linux x86_64 and arm64): kubectl v1.37.1 (the
+  wizard's pin), prek 0.5.7, shellcheck 0.11.0, gitleaks 8.30.1, uv 0.13.5. The root module's lock
+  wins over a dependency's, so uv 0.13.5 replaces the 0.8.12 rules_uv pins (0.13.4 fixed
+  GHSA-hq85-5cpj-mr62).
+
+### Timings (Claude sandbox; the Bazel server dies with each Bash call)
+
+- First `bazel version` (bazelisk download of Bazel 9.3.1, extract, server start): 5.0 s.
+- First Go test, cold (SDK download, builder, stdlib): 81 s; adding the C++ test: 22 s; each arm64
+  cross build: 18 to 20 s; rules_uv's first compile: 16 s; first pnpm build through Bazel: 22 s;
+  the first OpenTofu tests: 10 s.
+- Check 1: 7.6 s in the worktree with a warm output base; 12.3 s in the fresh scratch clone (shared
+  repository cache, new output base).
+- Tool runs: the first `bazel run` of a call 2.5 to 4.6 s (server start), later ones in the same call
+  0.3 to 0.5 s; the six run labels of check 10: 14 s together.
+- `gazelle.check`: 7.5 s the first time, 4.4 s after.
+- `<C>` after the spike: 4.7 GB, of which the worktree's output root holds 4.5 GB.
+
+### Failures met and fixed
+
+- **The Bazel hosts were denied.** Claude's session reads `.claude/settings.json` from the main
+  checkout, which was still on an older `main` without #30's hosts. The three hosts #30 allows
+  (`releases.bazel.build`, `bcr.bazel.build`, `mirror.bazel.build`) went through each command's
+  `allowed_domains` instead; no other host was added that way.
+- **rules_go fetched go.dev's version index** (not allowlisted): with only `version` set,
+  `go_sdk.download` looks up the SDK hashes there. Pinning `sdks` with both Linux hashes (from
+  dl.google.com's `.sha256` files) fixed the root SDK. rules_go's own `go_sdk.from_file` still probes
+  go.dev and tolerates the failure, which records no facts in `MODULE.bazel.lock`.
+- **That probe cost about 30 s per Bash call in a fresh clone.** `go_sdk` is a reproducible
+  extension, so Bazel keeps its result in the output base's hidden lockfile, not in
+  `MODULE.bazel.lock`. Under `common --lockfile_mode=error` that hidden lockfile is never written, so
+  each new server re-evaluated the extension and re-ran the probe. One
+  `bazel mod deps --lockfile_mode=update` in the clone wrote it (no tracked file changed), and later
+  calls took 2.9 s. Part 2's `./setup` should run that once, or the operator allowlists go.dev so
+  the probe's facts land in the tracked lockfile.
+- **rules_uv's diff test could not reach PyPI.** Tests do not inherit the shell's proxy variables;
+  `test --test_env=HTTPS_PROXY --test_env=HTTP_PROXY --test_env=NO_PROXY` in `user.bazelrc` passes
+  their names, never their values.
+- **pnpm 12 could not take its store lock.** It puts the lock in `$XDG_RUNTIME_DIR`
+  (`/run/user/1000`, read-only here) and, because `<C>` is a different mount from the checkout, puts
+  its store in a `.pnpm-store` at the top of the checkout's mount (`/home/gaserban/src/homelab`).
+  `run --run_env=pnpm_config_store_dir=<C>/pnpm-store --run_env=XDG_RUNTIME_DIR=<C>` fixed both;
+  `npm_config_store_dir` is not read by pnpm 12.
+- **rules_js refused the lock without an `allowBuilds` setting.** `pnpm-workspace.yaml` now holds
+  `hoist: false` and an empty `allowBuilds: {}`, so no package's lifecycle hook runs.
+- **rules_ts asked for a transpiler choice:** `common --@aspect_rules_ts//ts:default_to_tsc_transpiler`
+  in `.bazelrc`.
+- **Aspect telemetry.** aspect_tools_telemetry (pulled in by rules_js and aspect_gazelle_prebuilt)
+  announces that it reports module versions to Aspect; `common --repo_env=DO_NOT_TRACK=1` in
+  `.bazelrc` opts out.
+- **Gazelle's naming.** Gazelle names Go targets after the import path's last element and JS
+  targets after the directory. `# gazelle:prefix github.com/gaserban/homelab/proto/hello` in
+  `proto/go` keeps `hello`, `hello_lib` and `hello_test`; `js_project_naming_convention component`
+  and `js_tests_naming_convention component_test_lib` in `proto/web` keep the check's labels, with
+  the test file renamed `component.test.tsx` (gazelle's default test pattern). The rest of its first
+  diff (visibility lines, a `ts_config`) was accepted as generated.
+- **The tool config printed build results:** `--show_result=0` joined `--ui_event_filters=-info
+  --noshow_progress` in `common:tool`; changing these UI flags between a build and a tool run did
+  not discard the analysis cache.
+- **The React test's expected markup was wrong at first:** `renderToStaticMarkup` writes no `<!-- -->`
+  separators; the test now expects `<p class="greeting">hello, homelab</p>`.
+- Outside check 1: `//proto/tf:validate` passed here (a module with no providers starts no plugin),
+  and `//proto/tf:lint` failed on rules_tf's own tflint config ("`module` attribute was removed in
+  v0.54.0"), not on a socket. Both stay out of scope until the first OpenTofu module.
+
+### Claude's `user.bazelrc`
+
+Written in the worktree root with absolute paths under `<C>` = `/home/gaserban/claude-bazel`, and
+copied into the scratch clone and the results worktree. Each line was tested by removing it in the
+scratch clone:
+
+| Line | Needed? |
+| --- | --- |
+| `startup --output_user_root=<C>/bazel` | yes: without it `FATAL: mkdir('/home/gaserban/.cache/bazel/_bazel_gaserban'): Read-only file system` |
+| `common --repo_env=HERMETIC_CC_TOOLCHAIN_CACHE_PREFIX=<C>/zig --action_env=HERMETIC_CC_TOOLCHAIN_CACHE_PREFIX=<C>/zig` | yes: without it the C++ build fails on `/home/gaserban/.cache/zig` |
+| `run --run_env=XDG_CACHE_HOME=<C>/xdg-cache` | yes: uv fails on `/home/gaserban/.cache/uv`; Go's build cache lands there too |
+| `run --run_env=PREK_HOME=<C>/prek` | kept: without it prek uses `<C>/xdg-cache/prek`, so it is redundant with `XDG_CACHE_HOME`, but check 17 tests `<C>/prek` |
+| `run --run_env=XDG_DATA_HOME=<C>/xdg-data` | not needed by the spike: pnpm's store is set directly |
+| `run --run_env=GOPATH=<C>/go` | not exercised: no target runs `go mod`; without it `go env GOPATH` is `/home/gaserban/go` |
+| `run --run_env=pnpm_config_store_dir=<C>/pnpm-store --run_env=XDG_RUNTIME_DIR=<C>` | yes, added by the spike (pnpm, above) |
+| `test --test_env=HTTPS_PROXY --test_env=HTTP_PROXY --test_env=NO_PROXY` | yes, added by the spike, for Claude's sandbox proxy (rules_uv's diff test) |
+
+The plan's wipe of `<C>`'s children should add `pnpm-store` and the lock file
+`pnpm-store-operation-locks-1000` that pnpm leaves in `<C>`.
+
+### Hook shims, as tested in the scratch clone (mode 755)
+
+`.git/hooks/pre-commit`:
+
+```bash
+#!/bin/bash
+# prek's pre-commit hooks, run through Bazel with this checkout's configuration.
+exec bazel run --config=tool @multitool//tools/prek:cwd -- run --config .pre-commit-config.yaml --hook-stage pre-commit
+```
+
+`.git/hooks/pre-push`:
+
+```bash
+#!/bin/bash
+# prek's pre-push hooks, run through Bazel once per pushed ref. A deletion is skipped; a new ref, or
+# one whose remote commit is not here, is checked from origin/main.
+rc=0
+while read -r _ local_sha _ remote_sha; do
+  case "$local_sha" in *[!0]*) ;; *) continue ;; esac
+  base=$remote_sha
+  case "$remote_sha" in *[!0]*) git cat-file -e "$remote_sha^{commit}" 2>/dev/null || base=origin/main ;; *) base=origin/main ;; esac
+  bazel run --config=tool @multitool//tools/prek:cwd -- run --config .pre-commit-config.yaml \
+    --hook-stage pre-push --from-ref "$base" --to-ref "$local_sha" </dev/null || rc=1
+done
+exit "$rc"
+```
+
+Both pass shellcheck at warning level. The loop reads `</dev/null` for each prek run so Bazel and
+prek cannot swallow git's ref lines. The spike's `.pre-commit-config.yaml` holds part 3's
+`shellcheck` (`-S warning`, `types: [shell]`, pre-commit) and `gitleaks` (`bash -c`, `git -v --redact
+--log-opts="--diff-merges=first-parent ${PRE_COMMIT_FROM_REF:?}..${PRE_COMMIT_TO_REF:?}"`, pre-push)
+entries. A `prek run --all-files` there also shows the known SC1010 and SC1087 findings in the
+tracked hooks.
+
+### Hosts contacted
+
+Allowed by the sandbox: github.com and its release-asset hosts (rule archives, the Gazelle binary,
+Python builds, OpenTofu, tflint, terraform-docs, prek, uv, shellcheck, gitleaks),
+registry.npmjs.org (pnpm, TypeScript, React), dl.k8s.io (kubectl). Allowed by the operator's
+`settings.local.json` for this spike: dl.google.com (Go SDK), ziglang.org (Zig), nodejs.org
+(Node.js), pypi.org and files.pythonhosted.org (uv's resolution, the `packaging` wheel). The Bazel
+hosts releases.bazel.build and bcr.bazel.build were reached through `allowed_domains` (see Failures);
+mirror.bazel.build was allowed the same way, and whether anything used it was not recorded.
+Denied and tolerated: go.dev and golang.google.cn (rules_go's version index). Not contacted:
+proxy.golang.org and sum.golang.org (no external Go module), registry.opentofu.org (no provider).
+No denial for an Aspect telemetry host appeared: the first rules_js fetch printed that reporting
+starts on the next invocation, and every later one had `DO_NOT_TRACK=1`.
+
 ## Findings per candidate
 
 ### Bazel (rules_js, rules_python or rules_py, rules_tf)
