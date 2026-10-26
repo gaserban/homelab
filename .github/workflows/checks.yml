@@ -31,21 +31,41 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
+      # Every per-runner value in one place. gitleaks matches tools/multitool.lock.json; bazelisk
+      # matches ./setup's pin (a bump changes setup, this file and docs/operator-setup.md in one PR).
+      # The cache key's prefix covers the arch and both locks; each run's own key adds the commit.
+      - name: pins and cache key for this runner
+        id: pins
+        run: |
+          case "$RUNNER_ARCH" in
+            X64)
+              gitleaks_asset=linux_x64 gitleaks_sha256=551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
+              bazelisk_arch=amd64 bazelisk_sha256=a248ae2b2b62b5baebb748f6fba7203bff1a27e5d01b55399a8406744cb539e8 ;;
+            ARM64)
+              gitleaks_asset=linux_arm64 gitleaks_sha256=e4a487ee7ccd7d3a7f7ec08657610aa3606637dab924210b3aee62570fb4b080
+              bazelisk_arch=arm64 bazelisk_sha256=b2bcc040c213b44586b121bda6d983c35df121b917c3a7a66fb16f2fa0df1a4f ;;
+            *) echo "no pins for $RUNNER_ARCH" >&2; exit 1 ;;
+          esac
+          {
+            echo "gitleaks_url=https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_$gitleaks_asset.tar.gz"
+            echo "gitleaks_sha256=$gitleaks_sha256"
+            echo "bazelisk_url=https://github.com/bazelbuild/bazelisk/releases/download/v1.30.0/bazelisk-linux-$bazelisk_arch"
+            echo "bazelisk_sha256=$bazelisk_sha256"
+            echo "cache_prefix=bazel-disk-$RUNNER_ARCH-${{ hashFiles('MODULE.bazel.lock', 'tools/multitool.lock.json') }}-"
+          } >> "$GITHUB_OUTPUT"
+
       # Before any of the pull request's code runs. The binary is pinned here, not by the PR's lock;
       # scanning from main's worktree applies main's .gitleaksignore, .gitleaks.toml and
       # .gitattributes, so a PR cannot silence a finding with its own; inline allow markers are
-      # ignored; first-parent diffs scan what a merge brings in. Same version as
-      # tools/multitool.lock.json.
+      # ignored; first-parent diffs scan what a merge brings in.
       - name: gitleaks over the pull request's commits
         if: github.event_name == 'pull_request'
+        env:
+          URL: ${{ steps.pins.outputs.gitleaks_url }}
+          SHA256: ${{ steps.pins.outputs.gitleaks_sha256 }}
         run: |
-          case "$RUNNER_ARCH" in
-            X64) asset=linux_x64 sum=551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb ;;
-            ARM64) asset=linux_arm64 sum=e4a487ee7ccd7d3a7f7ec08657610aa3606637dab924210b3aee62570fb4b080 ;;
-            *) echo "no gitleaks pin for $RUNNER_ARCH" >&2; exit 1 ;;
-          esac
-          curl -fsSLo "$RUNNER_TEMP/gitleaks.tar.gz" "https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_$asset.tar.gz"
-          echo "$sum  $RUNNER_TEMP/gitleaks.tar.gz" | sha256sum -c -
+          curl -fsSLo "$RUNNER_TEMP/gitleaks.tar.gz" "$URL"
+          echo "$SHA256  $RUNNER_TEMP/gitleaks.tar.gz" | sha256sum -c -
           mkdir "$RUNNER_TEMP/gitleaks"
           tar -xzf "$RUNNER_TEMP/gitleaks.tar.gz" -C "$RUNNER_TEMP/gitleaks" gitleaks
           git worktree add --detach "$RUNNER_TEMP/base" origin/main
@@ -54,17 +74,14 @@ jobs:
             --ignore-gitleaks-allow "$RUNNER_TEMP/base"
           git worktree remove --force "$RUNNER_TEMP/base"
 
-      # bazelisk at ./setup's pin (a bump changes setup and this file in one PR).
       - name: bazelisk v1.30.0 as bazel
+        env:
+          URL: ${{ steps.pins.outputs.bazelisk_url }}
+          SHA256: ${{ steps.pins.outputs.bazelisk_sha256 }}
         run: |
-          case "$RUNNER_ARCH" in
-            X64) arch=amd64 sum=a248ae2b2b62b5baebb748f6fba7203bff1a27e5d01b55399a8406744cb539e8 ;;
-            ARM64) arch=arm64 sum=b2bcc040c213b44586b121bda6d983c35df121b917c3a7a66fb16f2fa0df1a4f ;;
-            *) echo "no bazelisk pin for $RUNNER_ARCH" >&2; exit 1 ;;
-          esac
           mkdir -p "$RUNNER_TEMP/bin"
-          curl -fsSLo "$RUNNER_TEMP/bin/bazel" "https://github.com/bazelbuild/bazelisk/releases/download/v1.30.0/bazelisk-linux-$arch"
-          echo "$sum  $RUNNER_TEMP/bin/bazel" | sha256sum -c -
+          curl -fsSLo "$RUNNER_TEMP/bin/bazel" "$URL"
+          echo "$SHA256  $RUNNER_TEMP/bin/bazel" | sha256sum -c -
           chmod 755 "$RUNNER_TEMP/bin/bazel"
           echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
 
@@ -73,9 +90,8 @@ jobs:
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ runner.temp }}/bazel-disk
-          key: bazel-disk-${{ runner.arch }}-${{ hashFiles('MODULE.bazel.lock', 'tools/multitool.lock.json') }}-${{ github.sha }}
-          restore-keys: |
-            bazel-disk-${{ runner.arch }}-${{ hashFiles('MODULE.bazel.lock', 'tools/multitool.lock.json') }}-
+          key: ${{ steps.pins.outputs.cache_prefix }}${{ github.sha }}
+          restore-keys: ${{ steps.pins.outputs.cache_prefix }}
 
       # user.bazelrc is untracked and rc files expand no variables, so the shell writes the path.
       - name: disk cache in user.bazelrc
@@ -87,15 +103,25 @@ jobs:
       - name: ./setup
         run: ./setup
 
-      # A second ./setup changes no tool (bazelisk and the eight locked binaries) and no file.
+      # A second ./setup changes no tool and no file: the hashes of bazelisk and of every tool in
+      # tools/multitool.lock.json are the same before and after it, and the tree stays clean.
       - name: ./setup again changes nothing
         run: |
-          S=$RUNNER_TEMP
-          # $L and the cquery output are label and path lists, split on purpose.
-          # shellcheck disable=SC2046,SC2086
-          L="@multitool//tools/shellcheck @multitool//tools/gitleaks @multitool//tools/buildifier @multitool//tools/kubectl @multitool//tools/kind @multitool//tools/flux @multitool//tools/helm @multitool//tools/prek" && bazel build $L && h() { sha256sum "$(readlink -f "$(command -v bazel)")" $(bazel cquery --output=files "set($L)" | sed "s|^|$(bazel info execution_root)/|" | xargs readlink -f); } && h > "$S/h1" && ./setup && h | diff "$S/h1" - && test "$(wc -l < "$S/h1")" = 9 || exit 1
-          status=$(git status --porcelain)
-          if [ -n "$status" ]; then printf 'setup changed the working tree:\n%s\n' "$status" >&2; exit 1; fi
+          mapfile -t tools < <(jq -r 'keys[] | select(startswith("$") | not) | "@multitool//tools/" + .' tools/multitool.lock.json)
+          bazel build "${tools[@]}"
+          execution_root=$(bazel info execution_root)
+          tool_hashes() {
+            bazel cquery --output=files "set(${tools[*]})" | sed "s|^|$execution_root/|" | xargs readlink -f \
+              | xargs sha256sum "$(readlink -f "$(command -v bazel)")"
+          }
+          tool_hashes > "$RUNNER_TEMP/before"
+          ./setup
+          tool_hashes | diff "$RUNNER_TEMP/before" -
+          if [ "$(wc -l < "$RUNNER_TEMP/before")" -ne $(( ${#tools[@]} + 1 )) ]; then
+            echo "expected bazelisk and ${#tools[@]} tools in the hash list:" >&2; cat "$RUNNER_TEMP/before" >&2; exit 1
+          fi
+          changed=$(git status --porcelain)
+          if [ -n "$changed" ]; then printf 'setup changed the working tree:\n%s\n' "$changed" >&2; exit 1; fi
 
       - name: prek over all files
         run: bazel run --config=tool @multitool//tools/prek:cwd -- run --all-files --config .pre-commit-config.yaml
@@ -108,4 +134,4 @@ jobs:
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ runner.temp }}/bazel-disk
-          key: bazel-disk-${{ runner.arch }}-${{ hashFiles('MODULE.bazel.lock', 'tools/multitool.lock.json') }}-${{ github.sha }}
+          key: ${{ steps.pins.outputs.cache_prefix }}${{ github.sha }}
