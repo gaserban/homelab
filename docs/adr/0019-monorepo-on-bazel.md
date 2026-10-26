@@ -2,9 +2,13 @@
 
 Date: 2026-10-25
 
-Status: Proposed. Accepted when the prototype for #19 builds and tests, inside the Claude sandbox, a
-React component (Aspect rules_js and rules_ts with pnpm), a Python module (rules_uv), a Go and a C++
-target, an OpenTofu module (rules_tf format), and runs every tool through `bazel run`.
+Status: Accepted (2026-10-26). The prototype for #19 (#24) built and tested, inside the Claude
+sandbox, a React component (Aspect rules_js and rules_ts with pnpm), a Python module (rules_uv), a Go
+and a C++ target and an OpenTofu module (rules_tf format), and ran every tool through `bazel run`;
+its 20 checks passed ([monorepo-build-tool.md](../research/monorepo-build-tool.md), "Prototype
+results"), and its code is kept under the tag `spike-bazel-polyglot`, never merged. Corrected on
+acceptance, from the same results: the reason OpenTofu validate and lint wait (Context, Decision),
+and Go waits for an app that uses it (Decision).
 
 ## Context
 
@@ -15,8 +19,12 @@ default until compiled languages became certain
 ([monorepo-build-tool.md](../research/monorepo-build-tool.md)). Tested in the Claude sandbox on
 2026-10-25 (same note): Bazel 9.3.1 builds Go and C++ with downloaded toolchains and cross-compiles
 to arm64. Its `linux-sandbox` cannot start, because the Claude sandbox refuses user namespaces, and
-`allowNestedUserNamespaces` would let sandboxed code escape (ADR 0014). Unix sockets are refused too,
-so provider-backed `tofu` commands cannot run there.
+`allowNestedUserNamespaces` would let sandboxed code escape (ADR 0014). Creating a Unix socket is
+refused too, and OpenTofu providers and tflint plugins are reached over one. That pass blamed the
+socket for rules_tf's `validate` and `lint` failing; the prototype disproved it for both: `validate`
+passes on a module with no providers, which starts no plugin, and `lint` fails on rules_tf's own
+bundled tflint config ("`module` attribute was removed in v0.54.0"), not on a socket. No
+provider-backed command was run.
 
 ## Decision
 
@@ -84,14 +92,23 @@ so provider-backed `tofu` commands cannot run there.
 - Each language is wired when its first package lands, never ahead of it. One lockfile per language
   at the root: `pnpm-lock.yaml` read by Aspect's rules_js and rules_ts (`hoist: false`); Python from
   a root `pyproject.toml` compiled by rules_uv into a hashed `requirements.txt` for rules_python;
-  one `go.mod` with rules_go; C++ through hermetic_cc_toolchain. aspect_gazelle_prebuilt writes
-  BUILD files for every language it covers, and its check fails on a stale one. BUILD files list
-  sources explicitly; no recursive globs (Bazel BUILD style guide).
+  one `go.mod` with rules_go; C++ through hermetic_cc_toolchain. No Go code and no rules_go until
+  an app uses Go (the operator, 2026-10-26). That app's wiring first meets the prototype's go.dev
+  finding: rules_go looks up SDK hashes on go.dev, which is not allowlisted, unless `go_sdk` pins
+  both Linux hashes in `sdks`, and its `go_sdk.from_file` still probes go.dev on every new server
+  under `--lockfile_mode=error` (about 30 s in a fresh clone) until `bazel mod deps
+  --lockfile_mode=update` writes the output base's lockfile or the operator allowlists go.dev
+  ([monorepo-build-tool.md](../research/monorepo-build-tool.md), "Failures met and fixed").
+  aspect_gazelle_prebuilt writes BUILD files for every language it covers, and its check fails on a
+  stale one. BUILD files list sources explicitly; no recursive globs (Bazel BUILD style guide).
 - OpenTofu stays outside the graph for plan and apply (ADR 0007). rules_tf runs format, validate and
-  lint as tests. Validate and tflint need Unix sockets, which the Claude sandbox refuses, and they
-  run provider binaries the branch chooses: in CI they run on the runner; for Claude's commits on
-  the remote-execution worker (#21); for the operator's, in a throwaway dev-runtime container. The
-  hook entries land with the first OpenTofu module.
+  lint as tests, wired with the first OpenTofu module. Validate and lint are deferred to that
+  module, not for lack of sockets: before it there is nothing to check, and, measured on the
+  prototype, rules_tf's bundled tflint config fails on tflint 0.65.0, so that module brings a lint
+  config of its own. Once validate and lint run provider binaries the branch chooses (and reach
+  them over a Unix socket the Claude sandbox refuses), they run in CI on the runner; for Claude's
+  commits on the remote-execution worker (#21); for the operator's, in a throwaway dev-runtime
+  container. The hook entries land with the first OpenTofu module.
 - Checks split by question. Questions about the repository as git sees it (secrets, shell lint by
   file type, Bazel file format, the hook suite) run in prek from `.pre-commit-config.yaml`, at
   commit and push through the hooks above and in CI over git's tracked files; gitleaks scans the
@@ -109,7 +126,7 @@ so provider-backed `tofu` commands cannot run there.
   and built in #21; its port will extend the three ports ADR 0018 lets the tunnel forward.
 - Repo tooling: bash for glue (running and wiring other programs); Python once a script parses
   JSON, keeps state or passes about 100 lines (a Bazel `py_binary`, or stdlib `python3` where it
-  must run before Bazel); Go for standalone binaries
+  must run before Bazel); Go for standalone binaries, once an app has wired Go
   ([gates-and-repo-tooling.md](../research/gates-and-repo-tooling.md), part b). The Claude Code hooks stay
   bash and get shellcheck.
 
@@ -127,15 +144,26 @@ so provider-backed `tofu` commands cannot run there.
 - A Claude branch rebased over a commit that changed `.github/workflows/` may be refused on push,
   because its credential has no Workflows permission (unverified); branch from `origin/main` afresh.
 - Container images (rules_oci) are a separate decision.
-- Bash scripts at #19 (Done when 5):
+- Bash scripts at #19 (Done when 5): every tracked file whose first line is a bash shebang, one row
+  each. #19 replaced none. The Claude Code hooks stay bash by the repo-tooling rule above, whatever
+  their length; for the rest, "glue" means the rule's bash case (no JSON, no state, about 100 lines).
 
-| Script | Verdict | Reason |
+| File | Verdict | Reason |
 | --- | --- | --- |
-| `.claude/hooks/branch-cleanup.sh`, `.claude/hooks/flow-review-bound.sh`, `.claude/hooks/git-guard.sh`, `.claude/hooks/issue-template.sh`, `.claude/hooks/skills-restore.sh`, `.claude/hooks/test.sh` | kept | ADR 0019: Claude Code hooks stay bash, under shellcheck; operator-owned |
-| `.claude/hooks/token-refresh.sh`, `tools/gh`, `tools/gh-app-token`, `tools/git-credential-homelab-app` | kept, named exception until #20 | #20 replaces them with `gh` and a machine account |
-| `tools/setup-dev-runtime.sh` | kept, named exception | the operator's once-per-workstation root wizard (`wizard` skill form) |
-| `tools/hl-runtime` | kept, named exception | keeps SSH keys but is ssh and podman wiring with no JSON |
-| new `setup`, `tools/ci-bazel-test` | new | glue that parses no JSON; `setup` checks what must exist before Bazel's tools |
+| `.claude/hooks/branch-cleanup.sh` | kept | Claude Code hook (deletes merged branches at session start); hooks stay bash, under shellcheck and the hook suite |
+| `.claude/hooks/flow-review-bound.sh` | kept | Claude Code hook (bounds hl-engineer's plan-review rounds); hooks stay bash, under shellcheck and the hook suite |
+| `.claude/hooks/git-guard.sh` | kept | Claude Code hook (the merge guard and the hook-bypass denials); hooks stay bash, under shellcheck and the hook suite |
+| `.claude/hooks/issue-template.sh` | kept | Claude Code hook (refuses an issue body without the four headings); hooks stay bash, under shellcheck and the hook suite |
+| `.claude/hooks/skills-restore.sh` | kept | Claude Code hook (restores downloaded skills, ADR 0017); hooks stay bash, under shellcheck and the hook suite |
+| `.claude/hooks/test.sh` | kept | the hook suite, run by prek's `hook-suite` entry; tests bash hooks by feeding them payloads |
+| `.claude/hooks/token-refresh.sh` | kept until #20 | Claude Code hook that mints the App token outside the sandbox; #20 removes it with the App token scripts, for `gh` and a machine account |
+| `setup` | kept (new, #25) | glue that must run before Bazel: checks Podman, bubblewrap and the bazelisk pin, then `bazel fetch` |
+| `tools/ci-bazel-test` | kept (new, #26) | CI glue around `bazel test //...` that accepts exit 4 only while no test target exists |
+| `tools/gh` | kept until #20, named exception | wraps `/usr/bin/gh` with the App token; #20 removes it, for `gh` itself logged in as a machine account |
+| `tools/gh-app-token` | kept until #20, named exception | mints and caches the App installation token (openssl, curl); #20 removes it |
+| `tools/git-credential-homelab-app` | kept until #20, named exception | git credential helper serving the App token; #20 removes it, for `gh auth setup-git` |
+| `tools/hl-runtime` | kept | glue at the 100-line mark: ssh, socat and podman wiring to the rootless Podman API (ADR 0018), no JSON; its kind, kubectl, flux and helm are already tool runs from the multitool lock (#25) |
+| `tools/setup-dev-runtime.sh` | kept, named exception | the operator's once-per-workstation root wizard, mostly the `wizard` skill's generated library; its kind, kubectl and flux installs stay as an amd64-only fallback (#25, `docs/operator-setup.md`) |
 
 - Prototypes and spikes keep scratch under `$TMPDIR/hl-proto/<name>/` and end with a cleanup check
   (#22).
