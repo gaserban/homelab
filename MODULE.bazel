@@ -83,3 +83,18 @@ use_repo(npm, "npm")
 typescript = use_extension("@aspect_rules_ts//ts:extensions.bzl", "typescript")
 typescript.deps(version_from = "//proto/web:package.json")
 use_repo(typescript, "npm_typescript")
+
+# OpenTofu: rules_tf runs format (and, outside this sandbox, validate and lint) as tests.
+bazel_dep(name = "rules_tf", version = "0.0.10")
+
+tf = use_extension("@rules_tf//tf:extensions.bzl", "tf_repositories")
+tf.download(
+    mirror = {},
+    tfdoc_version = "0.24.0",
+    tflint_version = "0.65.0",
+    use_tofu = True,
+    version = "1.13.2",
+)
+use_repo(tf, "tf_toolchains")
+
+register_toolchains("@tf_toolchains//:all")
