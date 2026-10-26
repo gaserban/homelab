@@ -161,6 +161,7 @@ The human index. Claude picks visible skills by description; the operator types 
 | setup-matt-pocock-skills | tracker labels and doc layout (run once; done 2026-10-25, `docs/agents/*.md`) | operator | mattpocock/skills |
 | ask-matt | nothing; off, it routes to skills not installed here | nobody | mattpocock/skills |
 | hl-engineer (draft, not yet run) | approved tickets, a plan comment on the issue, a local state file | operator | ours |
+| hl-blueprint (draft, not yet run) | `docs/agents/blueprints/<skill>.json` and the files its nodes expand to, through grilling, research and skill-creator; the Skill Blueprint editor republished | operator | ours |
 | hl-plan-reviewer (agent, draft) | plan findings per lens; read-only | Claude, through hl-engineer | ours |
 | hl-add-app (planned) | a PR with the app's manifests | operator (workflow) | ours |
 

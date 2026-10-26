@@ -1,0 +1,672 @@
+<title>Skill Blueprint</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
+<style>
+/* Layout: one-screen node editor. Toolbar band on top, blueprint grid canvas, inspector rail on
+   the right (a bottom sheet on phones). One deliberate dark "blueprint" world, not theme-switched. */
+:root {
+  --ground: #111820; --grid: #18212c; --grid-strong: #1f2a38;
+  --panel: #161e29; --panel-2: #1c2633; --raise: #243142; --line: #2b384a;
+  --fg: #dde5ef; --muted: #8d9aad; --faint: #627085; --accent: #63b0ea;
+  --k-stage: #3a6aa3; --k-procedure: #2b877e; --k-subskill: #3d8a4c; --k-subagent: #7553b0; --k-hook: #a8742a; --k-operator: #a84c66;
+  --s-idea: #6a7585; --s-inline: #b0953f; --s-grilled: #4b8fd0; --s-drafted: #a46ad0; --s-done: #4caf6c;
+  --wire: #a8bacf; --wire-loop: #e3a84f; --wire-uses: #6c8098;
+  --danger: #e06a6a;
+  --f-head: "Barlow Semi Condensed", "Arial Narrow", system-ui, sans-serif;
+  --f-body: "Barlow", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  color-scheme: dark;
+}
+html, body { height: 100%; }
+body { background: var(--ground); color: var(--fg); font: 14px/1.45 var(--f-body); overflow: hidden; }
+button, input, select, textarea { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.app { height: 100%; display: grid; grid-template-rows: auto auto 1fr; }
+
+/* Toolbar */
+.bar {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px;
+  padding-block: 10px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  background: var(--panel); border-bottom: 1px solid var(--line);
+}
+.brand { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
+.brand h1 { margin: 0; font: 700 20px/1 var(--f-head); letter-spacing: .02em; text-wrap: balance; }
+.brand .skill { font: 500 13px/1 var(--f-mono); color: var(--accent); }
+.counts { display: flex; flex-wrap: wrap; gap: 6px; }
+.count { display: inline-flex; align-items: center; gap: 6px; padding: 3px 8px; border-radius: 999px; background: var(--panel-2); font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.count b { color: var(--fg); font-weight: 600; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--c); flex: none; }
+.tools { display: flex; flex-wrap: wrap; gap: 6px; margin-left: auto; align-items: center; }
+.btn {
+  border: 1px solid var(--line); background: var(--panel-2); border-radius: 6px;
+  padding: 6px 11px; cursor: pointer; font-weight: 500; font-size: 13px; white-space: nowrap;
+}
+.btn:hover { background: var(--raise); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #0c1824; font-weight: 600; }
+.btn.primary:hover { filter: brightness(1.08); }
+.btn.danger { color: var(--danger); }
+.btn[disabled] { opacity: .45; cursor: default; }
+.btn.icon { padding: 6px 9px; min-width: 32px; }
+.dirty { font-size: 12px; color: var(--wire-loop); }
+
+.banner {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px;
+  padding-block: 8px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  background: #2a2416; color: #f0d9a8; border-bottom: 1px solid #4a3d1f; font-size: 13px;
+}
+
+/* Canvas */
+.main { display: grid; grid-template-columns: minmax(0, 1fr) 380px; min-height: 0; }
+.canvas {
+  position: relative; overflow: hidden; min-width: 0; touch-action: none; cursor: grab;
+  background-color: var(--ground);
+  background-image:
+    linear-gradient(var(--grid-strong) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-strong) 1px, transparent 1px),
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+}
+.canvas.panning { cursor: grabbing; }
+.world { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+#wires { position: absolute; left: 0; top: 0; width: 1px; height: 1px; overflow: visible; }
+.wire .vis { fill: none; stroke: var(--wire); stroke-width: 2.2; }
+.wire.w-loop .vis { stroke: var(--wire-loop); stroke-dasharray: 7 5; }
+.wire.w-uses .vis { stroke: var(--wire-uses); stroke-dasharray: 2 5; stroke-linecap: round; stroke-width: 2; }
+.wire .hit { fill: none; stroke: transparent; stroke-width: 14; cursor: pointer; pointer-events: stroke; }
+.wire.sel .vis { stroke: var(--accent); stroke-width: 3; }
+.wire text {
+  font: 500 11.5px var(--f-mono); fill: var(--muted); paint-order: stroke;
+  stroke: var(--ground); stroke-width: 5px; stroke-linejoin: round; pointer-events: none;
+}
+.wire.sel text { fill: var(--accent); }
+.temp { fill: none; stroke: var(--accent); stroke-width: 2; stroke-dasharray: 4 4; }
+
+.node {
+  position: absolute; width: 220px; background: var(--panel-2); border: 1px solid var(--line);
+  border-radius: 7px; box-shadow: 0 8px 22px rgba(0, 0, 0, .38); user-select: none; cursor: move;
+}
+.node.s-idea { border-style: dashed; border-color: #4a5668; }
+.node.sel { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent), 0 8px 22px rgba(0, 0, 0, .38); }
+.nh {
+  display: flex; justify-content: space-between; align-items: center; gap: 6px; height: 24px; padding: 0 10px;
+  border-radius: 6px 6px 0 0; background: var(--kc, var(--k-stage));
+  font: 600 11px/1 var(--f-head); letter-spacing: .09em; text-transform: uppercase; color: #f2f6fb;
+}
+.k-stage { --kc: var(--k-stage); } .k-procedure { --kc: var(--k-procedure); } .k-subskill { --kc: var(--k-subskill); }
+.k-subagent { --kc: var(--k-subagent); } .k-hook { --kc: var(--k-hook); } .k-operator { --kc: var(--k-operator); }
+.gate { padding: 2px 6px; border-radius: 3px; background: rgba(0, 0, 0, .28); letter-spacing: .06em; }
+.gate.g-gate { background: #f2f6fb; color: #182230; }
+.nb { padding: 8px 12px 10px; display: grid; gap: 4px; }
+.nt { font: 600 17px/1.15 var(--f-head); letter-spacing: .01em; }
+.nt.untitled { color: var(--faint); font-style: italic; }
+.ni { font-size: 12.5px; color: var(--muted); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.nf { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 4px; }
+.st {
+  display: inline-flex; align-items: center; gap: 5px; font: 600 10.5px/1 var(--f-head);
+  letter-spacing: .08em; text-transform: uppercase; color: var(--c);
+}
+.st::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--c); }
+.nid { font: 400 10.5px var(--f-mono); color: var(--faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.s-idea { --c: var(--s-idea); } .s-inline { --c: var(--s-inline); } .s-grilled { --c: var(--s-grilled); }
+.s-drafted { --c: var(--s-drafted); } .s-done { --c: var(--s-done); }
+.pin {
+  position: absolute; top: 30px; width: 12px; height: 12px; border-radius: 50%;
+  background: var(--ground); border: 2px solid var(--wire);
+}
+.pin.in { left: -7px; }
+.pin.out { right: -7px; cursor: crosshair; }
+.pin.out:hover { background: var(--accent); border-color: var(--accent); }
+.hud { position: absolute; left: 12px; bottom: 10px; font: 400 11px var(--f-mono); color: var(--faint); pointer-events: none; }
+.empty { position: absolute; inset: 0; display: grid; place-items: center; padding: 24px; text-align: center; color: var(--muted); }
+
+/* Inspector */
+.side { background: var(--panel); border-left: 1px solid var(--line); overflow-y: auto; min-width: 0; }
+.side-in { padding: 18px 18px 28px; display: grid; gap: 18px; padding-right: max(18px, env(safe-area-inset-right, 0px)); }
+.side h2 { margin: 0; font: 700 22px/1.1 var(--f-head); text-wrap: balance; }
+.side h3 { margin: 0 0 8px; font: 600 11px/1 var(--f-head); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+.side p { margin: 0; color: var(--muted); max-width: 62ch; }
+.kindband { height: 4px; border-radius: 2px; background: var(--kc); }
+.field { display: grid; gap: 5px; }
+.field label { font-size: 12px; color: var(--muted); font-weight: 500; }
+.field input, .field select, .field textarea {
+  width: 100%; box-sizing: border-box; background: var(--ground); border: 1px solid var(--line);
+  border-radius: 6px; padding: 7px 9px;
+}
+.field textarea { resize: vertical; min-height: 62px; }
+.field .mono, .mono { font-family: var(--f-mono); font-size: 12px; }
+.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.hint { font-size: 12px; color: var(--faint); }
+.err { font-size: 12px; color: var(--danger); }
+.list { margin: 0; padding-left: 18px; display: grid; gap: 4px; color: var(--fg); }
+.list li { max-width: 62ch; }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.steps { margin: 0; padding: 0; list-style: none; display: grid; gap: 12px; counter-reset: s; }
+.steps li { display: grid; grid-template-columns: 26px 1fr; gap: 10px; counter-increment: s; }
+.steps li::before {
+  content: counter(s); width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center;
+  background: var(--raise); font: 600 13px/1 var(--f-head); color: var(--accent);
+}
+.steps b { display: block; font: 600 15px/1.2 var(--f-head); margin-bottom: 2px; }
+.steps span { color: var(--muted); }
+code { font: 12px var(--f-mono); background: var(--ground); border: 1px solid var(--line); border-radius: 4px; padding: 1px 4px; }
+.legend { display: grid; gap: 6px; }
+.legend div { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.legend .sw { width: 22px; height: 10px; border-radius: 3px; background: var(--kc); flex: none; }
+.legend svg { flex: none; }
+.legend em { color: var(--muted); font-style: normal; }
+.doc {
+  background: var(--ground); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px;
+  font-size: 13px; overflow-wrap: anywhere; min-width: 0;
+}
+.doc :first-child { margin-top: 0; } .doc :last-child { margin-bottom: 0; }
+.doc h1, .doc h2, .doc h3 { font-family: var(--f-head); font-size: 15px; margin: 14px 0 6px; color: var(--fg); }
+.doc p, .doc li { color: #c4cedb; }
+.doc ul, .doc ol { padding-left: 20px; }
+.doc pre { overflow-x: auto; background: var(--panel); padding: 10px; border-radius: 6px; }
+.doc pre code { border: 0; padding: 0; background: none; }
+.doc table { border-collapse: collapse; display: block; overflow-x: auto; }
+.doc td, .doc th { border: 1px solid var(--line); padding: 4px 6px; }
+.raw { white-space: pre-wrap; font: 12px/1.5 var(--f-mono); margin: 0; }
+
+.toast {
+  position: fixed; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%);
+  background: var(--raise); border: 1px solid var(--line); border-radius: 8px; padding: 9px 14px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, .45); font-size: 13px; z-index: 30; max-width: calc(100% - 32px);
+}
+.modal { position: fixed; inset: 0; background: rgba(5, 9, 14, .7); display: grid; place-items: center; z-index: 40; padding: 16px; }
+.modal-in { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 18px; width: min(720px, 100%); display: grid; gap: 12px; }
+.modal textarea { width: 100%; box-sizing: border-box; height: 50vh; background: var(--ground); border: 1px solid var(--line); border-radius: 6px; padding: 10px; font: 12px/1.5 var(--f-mono); }
+
+@media (max-width: 760px) {
+  .main { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) minmax(0, 46%); }
+  .side { border-left: 0; border-top: 1px solid var(--line); }
+  .side-in { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+  .tools { margin-left: 0; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+
+<div class="app">
+  <header class="bar">
+    <div class="brand"><h1>Skill Blueprint</h1><span class="skill" id="skillName"></span></div>
+    <div class="counts" id="counts"></div>
+    <div class="tools">
+      <span class="dirty" id="dirty" hidden>Unsynced changes</span>
+      <button class="btn" id="addBtn" type="button">Add node</button>
+      <button class="btn icon" id="zoomOut" type="button" aria-label="Zoom out">−</button>
+      <button class="btn icon" id="zoomIn" type="button" aria-label="Zoom in">+</button>
+      <button class="btn" id="fitBtn" type="button">Fit</button>
+      <button class="btn" id="discardBtn" type="button" disabled>Discard changes</button>
+      <button class="btn primary" id="copyBtn" type="button">Copy for Claude</button>
+    </div>
+  </header>
+  <div class="banner" id="banner" hidden></div>
+  <div class="main">
+    <div class="canvas" id="canvas">
+      <div class="world" id="world">
+        <svg id="wires" xmlns="http://www.w3.org/2000/svg"></svg>
+        <div id="nodes"></div>
+      </div>
+      <div class="hud" id="hud"></div>
+      <div class="empty" id="empty" hidden></div>
+    </div>
+    <aside class="side"><div class="side-in" id="side"></div></aside>
+  </div>
+</div>
+
+<script>
+(() => {
+  const W = 220, PIN = 36, GRID = 10;
+  const KINDS = {
+    stage: "Stage", procedure: "Procedure", subskill: "Sub-skill",
+    subagent: "Subagent", hook: "Hook", operator: "Operator step",
+  };
+  const KIND_HELP = {
+    stage: "A step of the conductor. Expands to a reference file it reads when the step starts.",
+    procedure: "A routine several steps call. Expands to a reference file.",
+    subskill: "A skill of its own, reachable from other skills.",
+    subagent: "An isolated agent with its own tools and model.",
+    hook: "A rule that must hold every time, enforced by Claude Code.",
+    operator: "Something only you type, such as a hidden skill. No file.",
+  };
+  const STATUSES = ["idea", "inline", "grilled", "drafted", "done"];
+  const STATUS_HELP = {
+    idea: "Title and intent only",
+    inline: "Prose lives inside SKILL.md today",
+    grilled: "Decisions recorded, nothing written yet",
+    drafted: "File written, not yet used on a real run",
+    done: "File written and used on a real run",
+  };
+  const GATES = { "": "None", checkpoint: "Checkpoint", gate: "Gate" };
+  const EDGE_KINDS = { flow: "Flow: hands over to", loop: "Loop: sends back to", uses: "Uses: calls" };
+
+  const $ = (id) => document.getElementById(id);
+  const canvas = $("canvas"), world = $("world"), wires = $("wires"), nodesEl = $("nodes"), side = $("side");
+
+  let G = null, PUB = "", staleDraft = null, sel = null;
+  const view = { x: 40, y: 60, s: 0.8 };
+  const heights = {};
+  const docCache = {};
+
+  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const canonical = (g) => JSON.stringify(g, null, 2);
+  const hash = (s) => { let h = 5381; for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0; return String(h >>> 0); };
+  const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+  const snap = (v) => Math.round(v / GRID) * GRID;
+  const byId = (id) => G.nodes.find((n) => n.id === id);
+  const slug = (s) => String(s).toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+
+  function normalize(g) {
+    g.skill = g.skill || "skill";
+    g.artifact = g.artifact || "";
+    g.nodes = (g.nodes || []).map((n) => ({
+      id: n.id, title: n.title || "", kind: KINDS[n.kind] ? n.kind : "stage", gate: n.gate || "",
+      status: STATUSES.includes(n.status) ? n.status : "idea", x: n.x || 0, y: n.y || 0,
+      intent: n.intent || "", target: n.target || "", decisions: n.decisions || [], research: n.research || [],
+    }));
+    g.edges = (g.edges || []).map((e) => ({ from: e.from, to: e.to, kind: EDGE_KINDS[e.kind] ? e.kind : "flow", label: e.label || "" }));
+    return { skill: g.skill, artifact: g.artifact, nodes: g.nodes, edges: g.edges };
+  }
+
+  function defaultTarget(n) {
+    switch (n.kind) {
+      case "stage": case "procedure": return `.claude/skills/${G.skill}/references/${n.id}.md`;
+      case "subskill": return `.claude/skills/hl-${n.id}/SKILL.md`;
+      case "subagent": return `.claude/agents/${n.id}.md`;
+      case "hook": return `.claude/hooks/${n.id}.sh`;
+      default: return "";
+    }
+  }
+
+  // ---- draft storage (per viewer, best effort) ----
+  const draftKey = () => `skill-blueprint:${G ? G.skill : "x"}`;
+  function readDraft(skill) {
+    try { const raw = localStorage.getItem(`skill-blueprint:${skill}`); return raw ? JSON.parse(raw) : null; } catch { return null; }
+  }
+  function saveDraft() {
+    try {
+      if (canonical(G) === PUB) localStorage.removeItem(draftKey());
+      else localStorage.setItem(draftKey(), JSON.stringify({ base: hash(PUB), graph: G }));
+    } catch { /* storage unavailable: edits stay in this tab */ }
+  }
+
+  // ---- view ----
+  function applyView() {
+    world.style.transform = `translate(${view.x}px, ${view.y}px) scale(${view.s})`;
+    const a = 100 * view.s, b = 20 * view.s;
+    canvas.style.backgroundSize = `${a}px ${a}px, ${a}px ${a}px, ${b}px ${b}px, ${b}px ${b}px`;
+    canvas.style.backgroundPosition = Array(4).fill(`${view.x}px ${view.y}px`).join(", ");
+    $("hud").textContent = `${Math.round(view.s * 100)}%  ·  drag the grid to pan, scroll to zoom, double-click to add`;
+  }
+  function fit() {
+    if (!G.nodes.length) { view.x = 40; view.y = 60; view.s = 0.8; applyView(); return; }
+    const r = canvas.getBoundingClientRect();
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    for (const n of G.nodes) {
+      x0 = Math.min(x0, n.x); y0 = Math.min(y0, n.y - 90);
+      x1 = Math.max(x1, n.x + W); y1 = Math.max(y1, n.y + (heights[n.id] || 120));
+    }
+    const pad = 40;
+    const s = clamp(Math.min((r.width - pad * 2) / (x1 - x0), (r.height - pad * 2) / (y1 - y0)), 0.25, 1.1);
+    view.s = s;
+    view.x = (r.width - (x1 - x0) * s) / 2 - x0 * s;
+    view.y = (r.height - (y1 - y0) * s) / 2 - y0 * s;
+    applyView();
+  }
+  function zoomAt(mx, my, ns) {
+    ns = clamp(ns, 0.25, 1.6);
+    view.x = mx - (mx - view.x) * ns / view.s;
+    view.y = my - (my - view.y) * ns / view.s;
+    view.s = ns;
+    applyView();
+  }
+  function toWorld(ev) {
+    const r = canvas.getBoundingClientRect();
+    return [(ev.clientX - r.left - view.x) / view.s, (ev.clientY - r.top - view.y) / view.s];
+  }
+
+  // ---- render ----
+  const isSel = (type, id) => sel && sel.type === type && sel.id === id;
+  function renderNodes() {
+    nodesEl.innerHTML = G.nodes.map((n) => `
+      <div class="node k-${n.kind} s-${n.status}${isSel("node", n.id) ? " sel" : ""}" data-id="${esc(n.id)}" style="left:${n.x}px;top:${n.y}px">
+        <div class="nh"><span>${esc(KINDS[n.kind])}</span>${n.gate ? `<span class="gate g-${n.gate}">${esc(GATES[n.gate])}</span>` : ""}</div>
+        <div class="nb">
+          <div class="nt${n.title ? "" : " untitled"}">${esc(n.title || "Untitled")}</div>
+          ${n.intent ? `<div class="ni">${esc(n.intent)}</div>` : ""}
+          <div class="nf"><span class="st">${n.status}</span><span class="nid">${esc(n.id)}</span></div>
+        </div>
+        <span class="pin in"></span><span class="pin out" title="Drag onto another node to wire"></span>
+      </div>`).join("");
+    for (const el of nodesEl.children) heights[el.dataset.id] = el.offsetHeight;
+  }
+  function anchor(n, side) {
+    const h = heights[n.id] || 110;
+    if (side === "out") return [n.x + W, n.y + PIN];
+    if (side === "in") return [n.x, n.y + PIN];
+    if (side === "bottom") return [n.x + W / 2, n.y + h];
+    return [n.x + W / 2, n.y];
+  }
+  function curve(e) {
+    const a = byId(e.from), b = byId(e.to);
+    if (!a || !b) return null;
+    let p0, p1, p2, p3;
+    if (e.kind === "uses") {
+      p0 = anchor(a, "bottom"); p3 = anchor(b, "top");
+      const dy = Math.max(40, Math.abs(p3[1] - p0[1]) / 2);
+      p1 = [p0[0], p0[1] + dy]; p2 = [p3[0], p3[1] - dy];
+    } else if (e.kind === "loop") {
+      p0 = anchor(a, "top"); p3 = anchor(b, "top");
+      const top = Math.min(p0[1], p3[1]) - (60 + Math.abs(p3[0] - p0[0]) * 0.12);
+      p1 = [p0[0], top]; p2 = [p3[0], top];
+    } else {
+      p0 = anchor(a, "out"); p3 = anchor(b, "in");
+      const dx = Math.max(60, Math.abs(p3[0] - p0[0]) / 2);
+      p1 = [p0[0] + dx, p0[1]]; p2 = [p3[0] - dx, p3[1]];
+    }
+    const mid = [0, 1].map((k) => (p0[k] + 3 * p1[k] + 3 * p2[k] + p3[k]) / 8);
+    return { d: `M${p0} C${p1} ${p2} ${p3}`, mid };
+  }
+  const DEFS = `<defs>${[["flow", "--wire"], ["loop", "--wire-loop"], ["uses", "--wire-uses"], ["sel", "--accent"]].map(([k, c]) =>
+    `<marker id="m-${k}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(${c})"/></marker>`).join("")}</defs>`;
+  let tempD = "";
+  function renderWires() {
+    wires.innerHTML = DEFS + G.edges.map((e, i) => {
+      const c = curve(e);
+      if (!c) return "";
+      const s = isSel("edge", i);
+      return `<g class="wire w-${e.kind}${s ? " sel" : ""}" data-i="${i}">
+        <path class="hit" d="${c.d}"/><path class="vis" d="${c.d}" marker-end="url(#m-${s ? "sel" : e.kind})"/>
+        ${e.label ? `<text x="${c.mid[0]}" y="${c.mid[1] - 7}" text-anchor="middle">${esc(e.label)}</text>` : ""}</g>`;
+    }).join("") + (tempD ? `<path class="temp" d="${tempD}"/>` : "");
+  }
+  function renderBar() {
+    $("skillName").textContent = G.skill;
+    $("counts").innerHTML = STATUSES.map((s) => {
+      const k = G.nodes.filter((n) => n.status === s).length;
+      return k ? `<span class="count s-${s}" title="${esc(STATUS_HELP[s])}"><span class="dot"></span>${s} <b>${k}</b></span>` : "";
+    }).join("");
+    const dirty = canonical(G) !== PUB;
+    $("dirty").hidden = !dirty;
+    $("discardBtn").disabled = !dirty;
+  }
+  function renderAll() { renderNodes(); renderWires(); renderBar(); renderSide(); }
+  function changed() { renderBar(); saveDraft(); }
+
+  // ---- inspector ----
+  function renderSide() {
+    if (!sel) return renderGuide();
+    if (sel.type === "node") return renderNodeSide(byId(sel.id));
+    return renderEdgeSide(G.edges[sel.id]);
+  }
+  function renderGuide() {
+    side.innerHTML = `
+      <div><h2>Sketch the flow, then grow each node into text</h2></div>
+      <ol class="steps">
+        <li><div><b>Sketch</b><span>Double-click the grid to add a node. Give it a title and one line of intent. Drag from a node's right pin onto another node to wire them.</span></div></li>
+        <li><div><b>Hand it over</b><span>Press Copy for Claude and paste into Claude Code. <code>/hl-blueprint ${esc(G.skill)} sync</code> writes the graph into the repo.</span></div></li>
+        <li><div><b>Expand a node</b><span><code>/hl-blueprint ${esc(G.skill)} expand &lt;node&gt;</code> grills you on it, researches what you can't answer, then writes its file with skill-creator.</span></div></li>
+        <li><div><b>Read it back</b><span>Claude republishes this page. Select a node to read the text it expands to.</span></div></li>
+      </ol>
+      <div><h3>Node kinds</h3><div class="legend">${Object.keys(KINDS).map((k) =>
+        `<div class="k-${k}"><span class="sw"></span>${esc(KINDS[k])} <em>${esc(KIND_HELP[k])}</em></div>`).join("")}</div></div>
+      <div><h3>Wires</h3><div class="legend">
+        <div><svg width="34" height="10"><path d="M1 5 H33" style="stroke:var(--wire);stroke-width:2.2"/></svg>Flow <em>hands its output to the next node</em></div>
+        <div><svg width="34" height="10"><path d="M1 5 H33" style="stroke:var(--wire-loop);stroke-width:2.2;stroke-dasharray:7 5"/></svg>Loop <em>sends work back</em></div>
+        <div><svg width="34" height="10"><path d="M2 5 H33" style="stroke:var(--wire-uses);stroke-width:2;stroke-dasharray:2 5;stroke-linecap:round"/></svg>Uses <em>calls it and comes back</em></div>
+      </div></div>
+      <div><h3>Status</h3><div class="legend">${STATUSES.map((s) =>
+        `<div class="s-${s}"><span class="dot"></span>${s} <em>${esc(STATUS_HELP[s])}</em></div>`).join("")}</div></div>`;
+  }
+  function renderNodeSide(n) {
+    const tgt = n.target || defaultTarget(n);
+    side.innerHTML = `
+      <div class="k-${n.kind}" style="display:grid;gap:10px"><div class="kindband"></div>
+        <h2>${esc(n.title || "Untitled node")}</h2>
+        <span class="st s-${n.status}" title="Claude sets the status">${n.status} · ${esc(STATUS_HELP[n.status])}</span></div>
+      <div class="field"><label for="f-title">Title</label><input id="f-title" value="${esc(n.title)}" placeholder="What this step does"></div>
+      <div class="field"><label for="f-intent">Intent</label><textarea id="f-intent" placeholder="One sentence: why this step exists">${esc(n.intent)}</textarea></div>
+      <div class="row2">
+        <div class="field"><label for="f-kind">Kind</label><select id="f-kind">${Object.keys(KINDS).map((k) => `<option value="${k}"${k === n.kind ? " selected" : ""}>${esc(KINDS[k])}</option>`).join("")}</select></div>
+        <div class="field"><label for="f-gate">Ends with</label><select id="f-gate">${Object.keys(GATES).map((k) => `<option value="${k}"${k === n.gate ? " selected" : ""}>${esc(GATES[k])}</option>`).join("")}</select></div>
+      </div>
+      <div class="field"><label for="f-id">Node id</label><input id="f-id" class="mono" value="${esc(n.id)}" spellcheck="false"><span class="err" id="idErr" hidden></span></div>
+      <div class="field"><label for="f-target">Expands to</label><input id="f-target" class="mono" value="${esc(n.target)}" placeholder="${esc(tgt || "no file")}" spellcheck="false">
+        <span class="hint">${esc(KIND_HELP[n.kind])}</span></div>
+      <div class="actions">
+        <button class="btn" id="cmdBtn" type="button">Copy expand command</button>
+        <button class="btn danger" id="delBtn" type="button">Delete node</button>
+      </div>
+      ${n.decisions.length ? `<div><h3>Decisions from grilling</h3><ul class="list">${n.decisions.map((d) => `<li>${esc(d)}</li>`).join("")}</ul></div>` : ""}
+      ${n.research.length ? `<div><h3>Research</h3><ul class="list">${n.research.map((d) => `<li class="mono">${esc(d)}</li>`).join("")}</ul></div>` : ""}
+      <div><h3>Text this node expands to</h3><div class="doc" id="doc"><p>Loading…</p></div></div>`;
+
+    const bind = (id, key, after) => $(id).addEventListener("input", (ev) => {
+      n[key] = ev.target.value; renderNodes(); renderWires(); changed(); if (after) after();
+    });
+    bind("f-title", "title", () => { side.querySelector("h2").textContent = n.title || "Untitled node"; });
+    bind("f-intent", "intent");
+    bind("f-target", "target");
+    bind("f-gate", "gate");
+    bind("f-kind", "kind", () => renderNodeSide(n));
+    $("f-id").addEventListener("change", (ev) => {
+      const next = slug(ev.target.value), err = $("idErr");
+      if (!next || (next !== n.id && byId(next))) {
+        err.hidden = false; err.textContent = next ? `Another node already uses "${next}".` : "Use letters, digits and dashes.";
+        ev.target.value = n.id; return;
+      }
+      err.hidden = true;
+      for (const e of G.edges) { if (e.from === n.id) e.from = next; if (e.to === n.id) e.to = next; }
+      n.id = next; sel.id = next; ev.target.value = next;
+      renderNodes(); renderWires(); changed(); loadDoc(n);
+    });
+    $("cmdBtn").addEventListener("click", () => copy(`/hl-blueprint ${G.skill} expand ${n.id}`, "Command copied."));
+    $("delBtn").addEventListener("click", () => deleteSelection());
+    loadDoc(n);
+  }
+  async function loadDoc(n) {
+    const box = $("doc");
+    if (!box) return;
+    const id = n.id;
+    if (!(id in docCache)) {
+      try {
+        const r = await fetch(`nodes/${encodeURIComponent(id)}.md`, { cache: "no-store" });
+        docCache[id] = r.ok ? await r.text() : null;
+      } catch { docCache[id] = null; }
+    }
+    if (!sel || sel.type !== "node" || sel.id !== id || !$("doc")) return;
+    const md = docCache[id];
+    if (md == null) {
+      $("doc").innerHTML = `<p>Nothing written for this node yet. Run <code>/hl-blueprint ${esc(G.skill)} expand ${esc(id)}</code> in Claude Code.</p>`;
+    } else if (window.marked) {
+      $("doc").innerHTML = window.marked.parse(md);
+    } else {
+      $("doc").innerHTML = `<pre class="raw">${esc(md)}</pre>`;
+    }
+  }
+  function renderEdgeSide(e) {
+    const a = byId(e.from), b = byId(e.to);
+    side.innerHTML = `
+      <div><h3>Wire</h3><h2>${esc(a?.title || e.from)} → ${esc(b?.title || e.to)}</h2></div>
+      <div class="field"><label for="e-kind">Kind</label><select id="e-kind">${Object.keys(EDGE_KINDS).map((k) => `<option value="${k}"${k === e.kind ? " selected" : ""}>${esc(EDGE_KINDS[k])}</option>`).join("")}</select></div>
+      <div class="field"><label for="e-label">What it carries</label><input id="e-label" class="mono" value="${esc(e.label)}" placeholder="e.g. 02-requirements.md">
+        <span class="hint">The handover file or fact. The next node refuses to start without it.</span></div>
+      <div class="actions"><button class="btn" id="flipBtn" type="button">Reverse direction</button><button class="btn danger" id="delBtn" type="button">Delete wire</button></div>`;
+    $("e-kind").addEventListener("input", (ev) => { e.kind = ev.target.value; renderWires(); changed(); });
+    $("e-label").addEventListener("input", (ev) => { e.label = ev.target.value; renderWires(); changed(); });
+    $("flipBtn").addEventListener("click", () => { [e.from, e.to] = [e.to, e.from]; renderAll(); changed(); });
+    $("delBtn").addEventListener("click", () => deleteSelection());
+  }
+
+  // ---- editing ----
+  function select(type, id) {
+    sel = type ? { type, id } : null;
+    renderNodes(); renderWires(); renderSide();
+  }
+  function addNode(x, y) {
+    let i = 1; while (byId(`node-${i}`)) i++;
+    const n = { id: `node-${i}`, title: "", kind: "stage", gate: "", status: "idea", x: snap(x), y: snap(y), intent: "", target: "", decisions: [], research: [] };
+    G.nodes.push(n);
+    changed(); select("node", n.id);
+    $("f-title")?.focus();
+  }
+  function deleteSelection() {
+    if (!sel) return;
+    if (sel.type === "node") {
+      G.nodes = G.nodes.filter((n) => n.id !== sel.id);
+      G.edges = G.edges.filter((e) => e.from !== sel.id && e.to !== sel.id);
+    } else {
+      G.edges.splice(sel.id, 1);
+    }
+    sel = null; renderAll(); changed();
+  }
+
+  // ---- pointer interaction ----
+  let drag = null;
+  canvas.addEventListener("pointerdown", (ev) => {
+    if (ev.button !== 0) return;
+    const pin = ev.target.closest(".pin.out"), nodeEl = ev.target.closest(".node"), wire = ev.target.closest(".wire");
+    const [wx, wy] = toWorld(ev);
+    canvas.setPointerCapture(ev.pointerId);
+    if (pin && nodeEl) {
+      drag = { mode: "wire", from: nodeEl.dataset.id };
+    } else if (nodeEl) {
+      const n = byId(nodeEl.dataset.id);
+      if (!isSel("node", n.id)) select("node", n.id);
+      drag = { mode: "node", n, ox: wx - n.x, oy: wy - n.y, moved: false };
+    } else if (wire) {
+      select("edge", +wire.dataset.i);
+      drag = null;
+    } else {
+      drag = { mode: "pan", sx: ev.clientX, sy: ev.clientY, vx: view.x, vy: view.y, moved: false };
+      canvas.classList.add("panning");
+    }
+  });
+  canvas.addEventListener("pointermove", (ev) => {
+    if (!drag) return;
+    const [wx, wy] = toWorld(ev);
+    if (drag.mode === "pan") {
+      const dx = ev.clientX - drag.sx, dy = ev.clientY - drag.sy;
+      if (Math.abs(dx) + Math.abs(dy) > 3) drag.moved = true;
+      view.x = drag.vx + dx; view.y = drag.vy + dy; applyView();
+    } else if (drag.mode === "node") {
+      const nx = snap(wx - drag.ox), ny = snap(wy - drag.oy);
+      if (nx === drag.n.x && ny === drag.n.y) return;
+      drag.n.x = nx; drag.n.y = ny; drag.moved = true;
+      const el = nodesEl.querySelector(`[data-id="${CSS.escape(drag.n.id)}"]`);
+      if (el) { el.style.left = nx + "px"; el.style.top = ny + "px"; }
+      renderWires();
+    } else if (drag.mode === "wire") {
+      const p0 = anchor(byId(drag.from), "out");
+      const dx = Math.max(50, Math.abs(wx - p0[0]) / 2);
+      tempD = `M${p0} C${[p0[0] + dx, p0[1]]} ${[wx - dx, wy]} ${[wx, wy]}`;
+      renderWires();
+    }
+  });
+  canvas.addEventListener("pointerup", (ev) => {
+    canvas.classList.remove("panning");
+    if (!drag) return;
+    const d = drag; drag = null;
+    if (d.mode === "pan" && !d.moved && sel) select(null);
+    if (d.mode === "node" && d.moved) changed();
+    if (d.mode === "wire") {
+      tempD = "";
+      const target = document.elementFromPoint(ev.clientX, ev.clientY)?.closest(".node");
+      const to = target?.dataset.id;
+      if (to && to !== d.from && !G.edges.some((e) => e.from === d.from && e.to === to)) {
+        G.edges.push({ from: d.from, to, kind: "flow", label: "" });
+        changed(); select("edge", G.edges.length - 1);
+      } else renderWires();
+    }
+  });
+  canvas.addEventListener("pointercancel", () => { drag = null; tempD = ""; canvas.classList.remove("panning"); renderWires(); });
+  canvas.addEventListener("dblclick", (ev) => {
+    if (ev.target.closest(".node, .wire")) return;
+    const [wx, wy] = toWorld(ev);
+    addNode(wx - W / 2, wy - 20);
+  });
+  canvas.addEventListener("wheel", (ev) => {
+    ev.preventDefault();
+    const r = canvas.getBoundingClientRect();
+    zoomAt(ev.clientX - r.left, ev.clientY - r.top, view.s * Math.exp(-ev.deltaY * 0.0015));
+  }, { passive: false });
+  document.addEventListener("keydown", (ev) => {
+    if (ev.target.closest("input, textarea, select")) return;
+    if ((ev.key === "Delete" || ev.key === "Backspace") && sel) { ev.preventDefault(); deleteSelection(); }
+    if (ev.key === "Escape" && sel) select(null);
+  });
+
+  // ---- toolbar ----
+  const centre = () => { const r = canvas.getBoundingClientRect(); return [r.width / 2, r.height / 2]; };
+  $("zoomIn").onclick = () => zoomAt(...centre(), view.s * 1.2);
+  $("zoomOut").onclick = () => zoomAt(...centre(), view.s / 1.2);
+  $("fitBtn").onclick = fit;
+  $("addBtn").onclick = () => { const [cx, cy] = centre(); addNode((cx - view.x) / view.s - W / 2, (cy - view.y) / view.s - 40); };
+  let discardArmed = null;
+  $("discardBtn").onclick = (ev) => {
+    const b = ev.currentTarget;
+    if (!discardArmed) {
+      b.textContent = "Click again to discard"; b.classList.add("danger");
+      discardArmed = setTimeout(() => { discardArmed = null; b.textContent = "Discard changes"; b.classList.remove("danger"); }, 3000);
+      return;
+    }
+    clearTimeout(discardArmed); discardArmed = null; b.textContent = "Discard changes"; b.classList.remove("danger");
+    G = normalize(JSON.parse(PUB)); sel = null; renderAll(); changed();
+  };
+  $("copyBtn").onclick = () => copy(`/hl-blueprint ${G.skill} sync\n\n\`\`\`json\n${canonical(G)}\n\`\`\`\n`, "Copied. Paste it into Claude Code.");
+
+  function toast(msg) {
+    const t = document.createElement("div"); t.className = "toast"; t.textContent = msg;
+    document.body.appendChild(t); setTimeout(() => t.remove(), 2600);
+  }
+  function copy(text, msg) {
+    const fallback = () => {
+      const m = document.createElement("div"); m.className = "modal";
+      m.innerHTML = `<div class="modal-in"><h2 style="margin:0;font:700 20px var(--f-head)">Copy this into Claude Code</h2>
+        <p style="margin:0;color:var(--muted)">This view blocks the clipboard. Select all and copy by hand.</p>
+        <textarea id="copyArea" readonly></textarea><div class="actions"><button class="btn primary" id="closeCopy" type="button">Done</button></div></div>`;
+      document.body.appendChild(m);
+      const ta = m.querySelector("textarea"); ta.value = text; ta.focus(); ta.select();
+      m.querySelector("#closeCopy").onclick = () => m.remove();
+    };
+    try { navigator.clipboard.writeText(text).then(() => toast(msg), fallback); } catch { fallback(); }
+  }
+
+  function showBanner() {
+    const b = $("banner");
+    if (!staleDraft) { b.hidden = true; return; }
+    b.hidden = false;
+    b.innerHTML = `<span>Claude published a newer blueprint since your last edit here. Your earlier edits are kept aside.</span>
+      <button class="btn" id="restoreDraft" type="button">Use my earlier edits</button><button class="btn" id="dropDraft" type="button">Drop them</button>`;
+    $("restoreDraft").onclick = () => { G = normalize(staleDraft.graph); staleDraft = null; sel = null; showBanner(); renderAll(); changed(); };
+    $("dropDraft").onclick = () => { staleDraft = null; showBanner(); saveDraft(); };
+  }
+
+  async function boot() {
+    let text = null;
+    try { const r = await fetch("graph.json", { cache: "no-store" }); if (r.ok) text = await r.text(); } catch { /* shown below */ }
+    if (!text) {
+      const e = $("empty"); e.hidden = false;
+      e.innerHTML = `<div><h2 style="font:700 22px var(--f-head);margin:0 0 6px">No blueprint loaded</h2><p style="margin:0">This page reads <code>graph.json</code> published next to it. Run <code>/hl-blueprint &lt;skill&gt; publish</code> in Claude Code.</p></div>`;
+      G = normalize({ nodes: [], edges: [] }); PUB = canonical(G); renderBar(); renderGuide(); applyView();
+      return;
+    }
+    const pub = normalize(JSON.parse(text));
+    PUB = canonical(pub);
+    const d = readDraft(pub.skill);
+    if (d && d.base === hash(PUB)) G = normalize(d.graph);
+    else { G = normalize(JSON.parse(PUB)); if (d) staleDraft = d; }
+    document.title = `${G.skill} · Skill Blueprint`;
+    renderAll(); showBanner(); fit();
+  }
+  applyView();
+  boot();
+})();
+</script>

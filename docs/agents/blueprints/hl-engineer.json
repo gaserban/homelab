@@ -1,0 +1,292 @@
+{
+  "skill": "hl-engineer",
+  "artifact": "https://claude.ai/artifact/L2aJLAnkSyRz9vz86U4myn",
+  "nodes": [
+    {
+      "id": "intake",
+      "title": "Intake",
+      "kind": "stage",
+      "gate": "",
+      "status": "inline",
+      "x": 0,
+      "y": 0,
+      "intent": "Read the issue, its ADRs and research notes; open the state file.",
+      "target": "",
+      "decisions": [],
+      "research": []
+    },
+    {
+      "id": "prior-art",
+      "title": "Prior art",
+      "kind": "stage",
+      "gate": "checkpoint",
+      "status": "inline",
+      "x": 300,
+      "y": 0,
+      "intent": "Answer what a practitioner already knows before anyone designs.",
+      "target": "",
+      "decisions": [],
+      "research": []
+    },
+    {
+      "id": "requirements",
+      "title": "Requirements",
+      "kind": "stage",
+      "gate": "gate",
+      "status": "inline",
+      "x": 600,
+      "y": 0,
+      "intent": "Grill the issue until every branch of the design tree is answered or open.",
+      "target": "",
+      "decisions": [],
+      "research": []
+    },
+    {
+      "id": "prototype",
+      "title": "Prototype the risky part",
+      "kind": "stage",
+      "gate": "checkpoint",
+      "status": "idea",
+      "x": 900,
+      "y": 0,
+      "intent": "Build the smallest throwaway code that proves the design works before the plan commits to it.",
+      "target": "",
+      "decisions": [],
+      "research": []
+    },
+    {
+      "id": "plan",
+      "title": "Draft the plan",
+      "kind": "stage",
+      "gate": "",
+      "status": "inline",
+      "x": 1200,
+      "y": 0,
+      "intent": "Options, a recommendation, and the checks that prove it.",
+      "target": "",
+      "decisions": [],
+      "research": []
+    },
+    {
+      "id": "plan-review",
+      "title": "Review loop",
+      "kind": "stage",
+      "gate": "gate",
+      "status": "inline",
+      "x": 1500,
+      "y": 0,
+      "intent": "Three lenses rerun every round until all pass or the bound is reached.",
+      "target": "",
+      "decisions": [],
+      "research": []
+    },
+    {
+      "id": "experiment",
+      "title": "Sandbox experiment",
+      "kind": "procedure",
+      "gate": "",
+      "status": "inline",
+      "x": 750,
+      "y": 250,
+      "intent": "Run the tool rather than argue about it; clean up after.",
+      "target": "",
+      "decisions": [],
+      "research": []
+    },
+    {
+      "id": "plan-reviewer",
+      "title": "hl-plan-reviewer",
+      "kind": "subagent",
+      "gate": "",
+      "status": "done",
+      "x": 1350,
+      "y": 250,
+      "intent": "Read-only Opus review through one lens.",
+      "target": ".claude/agents/hl-plan-reviewer.md",
+      "decisions": [],
+      "research": []
+    },
+    {
+      "id": "review-bound",
+      "title": "Review bound",
+      "kind": "hook",
+      "gate": "",
+      "status": "done",
+      "x": 1650,
+      "y": 250,
+      "intent": "Blocks reviewer launches past max_rounds.",
+      "target": ".claude/hooks/flow-review-bound.sh",
+      "decisions": [],
+      "research": []
+    },
+    {
+      "id": "breakdown",
+      "title": "Breakdown",
+      "kind": "stage",
+      "gate": "checkpoint",
+      "status": "inline",
+      "x": 0,
+      "y": 520,
+      "intent": "Cut the plan into vertical slices, each verifiable alone on dev.",
+      "target": "",
+      "decisions": [],
+      "research": []
+    },
+    {
+      "id": "adopt-or-build",
+      "title": "Adopt or build",
+      "kind": "stage",
+      "gate": "gate",
+      "status": "inline",
+      "x": 300,
+      "y": 520,
+      "intent": "One verdict per open part, from parallel research runs.",
+      "target": "",
+      "decisions": [],
+      "research": []
+    },
+    {
+      "id": "publish",
+      "title": "Publish",
+      "kind": "stage",
+      "gate": "",
+      "status": "inline",
+      "x": 600,
+      "y": 520,
+      "intent": "Apply amendments, post the plan comment, hand to the operator.",
+      "target": "",
+      "decisions": [],
+      "research": []
+    },
+    {
+      "id": "to-tickets",
+      "title": "/to-tickets",
+      "kind": "operator",
+      "gate": "",
+      "status": "done",
+      "x": 900,
+      "y": 520,
+      "intent": "The operator types it; it turns the plan comment into sub-issues.",
+      "target": "",
+      "decisions": [],
+      "research": []
+    },
+    {
+      "id": "close-out",
+      "title": "Close-out",
+      "kind": "stage",
+      "gate": "gate",
+      "status": "inline",
+      "x": 1200,
+      "y": 520,
+      "intent": "Check every sub-issue against the parts table.",
+      "target": "",
+      "decisions": [],
+      "research": []
+    }
+  ],
+  "edges": [
+    {
+      "from": "intake",
+      "to": "prior-art",
+      "kind": "flow",
+      "label": "00-intake.md"
+    },
+    {
+      "from": "prior-art",
+      "to": "requirements",
+      "kind": "flow",
+      "label": "01-prior-art.md"
+    },
+    {
+      "from": "prior-art",
+      "to": "experiment",
+      "kind": "uses",
+      "label": ""
+    },
+    {
+      "from": "requirements",
+      "to": "prototype",
+      "kind": "flow",
+      "label": "02-requirements.md"
+    },
+    {
+      "from": "prototype",
+      "to": "plan",
+      "kind": "flow",
+      "label": "what the prototype proved"
+    },
+    {
+      "from": "prototype",
+      "to": "experiment",
+      "kind": "uses",
+      "label": ""
+    },
+    {
+      "from": "plan",
+      "to": "plan-review",
+      "kind": "flow",
+      "label": "03-plan.md + 03-checks.md"
+    },
+    {
+      "from": "plan-review",
+      "to": "plan",
+      "kind": "loop",
+      "label": "findings"
+    },
+    {
+      "from": "plan-review",
+      "to": "plan-reviewer",
+      "kind": "uses",
+      "label": "×3 lenses"
+    },
+    {
+      "from": "plan-review",
+      "to": "review-bound",
+      "kind": "uses",
+      "label": ""
+    },
+    {
+      "from": "plan-review",
+      "to": "experiment",
+      "kind": "uses",
+      "label": ""
+    },
+    {
+      "from": "plan-review",
+      "to": "breakdown",
+      "kind": "flow",
+      "label": "approved plan"
+    },
+    {
+      "from": "breakdown",
+      "to": "adopt-or-build",
+      "kind": "flow",
+      "label": "04-parts.md"
+    },
+    {
+      "from": "adopt-or-build",
+      "to": "breakdown",
+      "kind": "loop",
+      "label": "verdict reshapes parts"
+    },
+    {
+      "from": "adopt-or-build",
+      "to": "publish",
+      "kind": "flow",
+      "label": "05-verdicts.md"
+    },
+    {
+      "from": "publish",
+      "to": "to-tickets",
+      "kind": "flow",
+      "label": "plan comment"
+    },
+    {
+      "from": "to-tickets",
+      "to": "close-out",
+      "kind": "flow",
+      "label": "sub-issues"
+    }
+  ]
+}
