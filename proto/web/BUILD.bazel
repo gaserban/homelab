@@ -1,6 +1,9 @@
 load("@aspect_rules_js//js:defs.bzl", "js_test")
-load("@aspect_rules_ts//ts:defs.bzl", "ts_project")
+load("@aspect_rules_ts//ts:defs.bzl", "ts_config", "ts_project")
 load("@npm//:defs.bzl", "npm_link_all_packages")
+
+# gazelle:js_project_naming_convention component
+# gazelle:js_tests_naming_convention component_test_lib
 
 npm_link_all_packages(name = "node_modules")
 
@@ -8,6 +11,8 @@ ts_project(
     name = "component",
     srcs = ["component.tsx"],
     declaration = True,
+    preserve_jsx = False,
+    tsconfig = ":tsconfig",
     deps = [
         ":node_modules/@types/react",
         ":node_modules/react",
@@ -17,8 +22,10 @@ ts_project(
 ts_project(
     name = "component_test_lib",
     testonly = True,
-    srcs = ["component_test.tsx"],
+    srcs = ["component.test.tsx"],
     declaration = True,
+    preserve_jsx = False,
+    tsconfig = ":tsconfig",
     deps = [
         ":component",
         ":node_modules/@types/react",
@@ -31,5 +38,11 @@ ts_project(
 js_test(
     name = "component_test",
     data = [":component_test_lib"],
-    entry_point = "component_test.js",
+    entry_point = "component.test.js",
+)
+
+ts_config(
+    name = "tsconfig",
+    src = "tsconfig.json",
+    visibility = [":__subpackages__"],
 )

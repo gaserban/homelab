@@ -1,9 +1,12 @@
 load("@rules_go//go:def.bzl", "go_binary", "go_library", "go_test")
 
+# Gazelle names Go targets after the import path's last element: hello, hello_lib, hello_test.
+# gazelle:prefix github.com/gaserban/homelab/proto/hello
+
 go_library(
     name = "hello_lib",
     srcs = ["hello.go"],
-    importpath = "github.com/gaserban/homelab/proto/go",
+    importpath = "github.com/gaserban/homelab/proto/hello",
     visibility = ["//visibility:private"],
 )
 

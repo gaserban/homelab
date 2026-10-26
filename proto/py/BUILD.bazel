@@ -10,6 +10,7 @@ pip_compile(
 py_library(
     name = "mod",
     srcs = ["mod.py"],
+    visibility = ["//:__subpackages__"],
     deps = ["@pypi//packaging"],
 )
 

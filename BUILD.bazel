@@ -1,3 +1,25 @@
+load("@aspect_gazelle_prebuilt//:def.bzl", "aspect_gazelle")
 load("@npm//:defs.bzl", "npm_link_all_packages")
 
+# gazelle:exclude .state
+# gazelle:exclude .flow
+# gazelle:exclude .claude/skills
+# gazelle:exclude .claude/worktrees
+# gazelle:prefix github.com/gaserban/homelab
+# gazelle:resolve py packaging @pypi//packaging
+
 npm_link_all_packages(name = "node_modules")
+
+# `bazel run //:gazelle` rewrites stale BUILD files; `//:gazelle.check` prints the diff and fails.
+aspect_gazelle(
+    name = "gazelle",
+    languages = [
+        "js",
+        "python",
+        "go",
+        "cc",
+    ],
+    # No external Go modules yet, so no go_deps repository config.
+    repo_config = None,
+    with_check = True,
+)

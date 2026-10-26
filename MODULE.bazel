@@ -98,3 +98,6 @@ tf.download(
 use_repo(tf, "tf_toolchains")
 
 register_toolchains("@tf_toolchains//:all")
+
+# BUILD generation: one prebuilt Gazelle binary carrying the js, python, go and cc languages.
+bazel_dep(name = "aspect_gazelle_prebuilt", version = "0.0.28")
