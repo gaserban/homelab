@@ -1,0 +1,37 @@
+# Repo-wide checks (ADR 0019), run by prek through Bazel:
+#   bazel run --config=tool @multitool//tools/prek:cwd -- run --all-files --config .pre-commit-config.yaml
+# Every tool is a tool run from tools/multitool.lock.json, except hook-suite (bash).
+repos:
+  - repo: local
+    hooks:
+      - id: shellcheck
+        name: shellcheck
+        entry: "bazel run --config=tool @multitool//tools/shellcheck:cwd -- -S warning"
+        language: system
+        types: [shell]
+        stages: [pre-commit]
+      - id: buildifier
+        name: buildifier
+        entry: "bazel run --config=tool @multitool//tools/buildifier:cwd -- -mode=check"
+        language: system
+        files: '(^|/)(BUILD|BUILD\.bazel|MODULE\.bazel|REPO\.bazel)$|\.bzl$'
+        stages: [pre-commit]
+      # The Claude Code hook suite, when a hook changes. It clears the outer commit's git
+      # environment (GIT_INDEX_FILE and the rest) so its scratch repos stay its own.
+      - id: hook-suite
+        name: hook-suite
+        entry: "bash -c 'unset $(git rev-parse --local-env-vars); exec bash .claude/hooks/test.sh'"
+        language: system
+        files: '^\.claude/hooks/'
+        pass_filenames: false
+        verbose: true
+        stages: [pre-commit]
+      # At push, over the pushed commits (prek sets PRE_COMMIT_FROM_REF/TO_REF from the shim's
+      # --from-ref/--to-ref); first-parent diffs scan what a merge brings in.
+      - id: gitleaks
+        name: gitleaks
+        entry: 'bash -c ''bazel run --config=tool @multitool//tools/gitleaks:cwd -- git -v --redact --log-opts="--diff-merges=first-parent ${PRE_COMMIT_FROM_REF:?}..${PRE_COMMIT_TO_REF:?}"'''
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-push]

@@ -1,0 +1,2 @@
+# The rules_multitool lock for the single-binary tools (ADR 0019), read by MODULE.bazel.
+exports_files(["multitool.lock.json"])
