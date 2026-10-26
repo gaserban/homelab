@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # PreToolUse hook (Bash matcher). Blocks commands that would take the merge away from the
-# operator or destroy history. Ordinary branch pushes, PR creation and comments stay allowed.
+# operator, destroy history or skip the commit and push hooks (prek, ADR 0019). Ordinary branch
+# pushes, PR creation and comments stay allowed.
 # Exit 2 = block; the message on stderr reaches Claude. Exit 0 = no opinion.
 #
 # Only the command string is inspected (tool_input.command). The earlier sed extraction swallowed
@@ -18,7 +19,10 @@ s='[[:space:]]'
 # "git push", allowing git's own options in between (-C dir, -c k=v, --no-pager), then the rest
 # of that one shell command up to the next ; & or |, so a "+" elsewhere in a compound command
 # does not count as a force push.
-push="git(${s}+-[^[:space:]]*(${s}+[^-[:space:]][^[:space:]]*)?)*${s}+push[^;&|]*"
+git="git(${s}+-[^[:space:]]*(${s}+[^-[:space:]][^[:space:]]*)?)*${s}+"
+push="${git}push[^;&|]*"
+commit="${git}commit[^;&|]*"
+lc="${cmd,,}"   # git config keys ignore case
 
 if   [[ "$cmd" =~ gh${s}+pr${s}+merge ]];                                then deny "merging a pull request"
 elif [[ "$cmd" =~ gh${s}+api.*/merge ]] || [[ "$cmd" =~ pulls/[^/]+/merge ]]; then deny "merging through the API"
@@ -29,5 +33,9 @@ elif [[ "$cmd" =~ git${s}+reset${s}+--hard ]];                           then de
 elif [[ "$cmd" =~ git${s}+branch${s}+(-D|--delete${s}+--force|--force${s}+--delete) ]]; then deny "forced branch delete"
 elif [[ "$cmd" =~ git${s}+clean${s}+-[a-zA-Z]*f ]];                      then deny "git clean -f"
 elif [[ "$cmd" =~ git${s}+(checkout|restore)${s}+\.(${s}|$) ]];           then deny "discarding all working changes"
+elif [[ "$cmd" =~ (${commit}|${push})${s}--no-verify(${s}|$) ]];        then deny "skipping the hooks (--no-verify)"
+elif [[ "$cmd" =~ ${commit}${s}-[a-zA-Z]*n[a-zA-Z]*(${s}|$) ]];          then deny "skipping the commit hook (commit -n)"
+elif [[ "$cmd" =~ (^|[^A-Za-z0-9_])(PREK_)?SKIP= ]];                     then deny "skipping hooks (SKIP / PREK_SKIP)"
+elif [[ "$lc" =~ core\.hookspath ]];                                     then deny "overriding core.hooksPath"
 fi
 exit 0

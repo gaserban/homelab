@@ -6,7 +6,7 @@
 # Exits 1 if any case mismatches.
 set -u
 cd "$(dirname "$0")/../.." || exit 1
-tmp="${TMPDIR:-/tmp}"; fail=0
+tmp=$(mktemp -d) || exit 1; trap 'rm -rf "$tmp"' EXIT; fail=0
 t() { # t <hook> <expected rc> <label> <command> [description]
   local hook=$1 want=$2 label=$3 c=$4 d=${5:-}
   local payload; payload=$(jq -cn --arg c "$c" --arg d "$d" '{tool_name:"Bash",tool_input:({command:$c} + (if $d=="" then {} else {description:$d} end))}')
@@ -43,6 +43,18 @@ t $G 2 'clean -fdx'                  'git clean -fdx'
 t $G 2 'clean -xf'                   'git clean -xf'
 t $G 2 'checkout .'                  'git checkout .'
 t $G 2 'restore .'                   'git restore .'
+t $G 2 'commit --no-verify'          'git commit --no-verify -m x'
+t $G 2 'push --no-verify'            'git push --no-verify origin feat'
+t $G 2 'commit -n'                   'git commit -n -m x'
+t $G 2 'commit -anm'                 'git commit -anm x'
+t $G 2 'git -C dir commit -n'        'git -C /tmp/x commit -n -m x'
+t $G 2 'PREK_SKIP'                   'PREK_SKIP=shellcheck git commit -m x'
+t $G 2 'SKIP on push'                'SKIP=gitleaks git push origin feat'
+t $G 2 'export SKIP'                 'export SKIP=shellcheck; git commit -m x'
+t $G 2 'env SKIP'                    'env SKIP=buildifier git commit -m x'
+t $G 2 '-c core.hooksPath'           'git -c core.hooksPath=/dev/null commit -m x'
+t $G 2 'config core.hooksPath'       'git config core.hooksPath /dev/null'
+t $G 2 'core.hooksPath, any case'    'git -c Core.HooksPath=x commit -m y'
 
 echo "# git-guard: allowed"
 t $G 0 'push branch'                 'git push -u origin feat'
@@ -63,6 +75,11 @@ t $G 0 'restore one path'            'git restore .claude/x'
 t $G 0 'branch -d'                   'git branch -d feat'
 t $G 0 'clean -n'                    'git clean -n'
 t $G 0 'multiline'                   $'ls\ngit push -u origin feat'
+t $G 0 'push -n is a dry run'        'git push -n origin feat'
+t $G 0 'commit -am'                  'git commit -am x'
+t $G 0 'commit msg has n words'      'git commit -m "add a new note"'
+t $G 0 'NOSKIP is another name'      'NOSKIP=1 ls'
+t $G 0 'MY_SKIP_LIST is another name' 'MY_SKIP_LIST=1 ls'
 
 echo "# issue-template"
 ok="$tmp/hooktest-body-ok.md"; printf '## Goal\nx\n## Done when\n- [ ] y\n## Out of scope\nz\n## Depends on\nnothing\n' > "$ok"
@@ -132,7 +149,7 @@ run() { printf '{"issue":%s,"stage":"plan","status":"%s","max_rounds":%s}\n' "$1
 R=hl-plan-reviewer
 rm -rf "$proj"; mkdir -p "$proj"
 a 0 'no .flow dir: reviewer passes'     $R $'Lens: Falsifier\nbrief'
-mkdir -p "$proj/.flow"; run 7 done 3
+mkdir -p "$proj/.flow"; run 7 'done' 3
 a 0 'no running run: reviewer passes'   $R $'Lens: Falsifier\nbrief'
 run 7 running 2
 a 0 'other agent type passes'           Explore 'find things'
@@ -219,15 +236,15 @@ g() { git -C "$bc/$1" -c user.name=t -c user.email=t@t -c init.defaultBranch=mai
 git init -q --bare -b main "$bc/origin.git"; git clone -q "$bc/origin.git" "$bc/repo" 2>/dev/null
 g repo commit -q --allow-empty -m base; g repo push -q origin main
 mk() { g repo switch -q -c "$1" main; g repo commit -q --allow-empty -m "$1"; g repo push -q -u origin "$1"; }
-mk done; mk partial; mk ahead; mk open; mk wt-clean; mk wt-dirty; mk here
+mk 'done'; mk partial; mk ahead; mk open; mk wt-clean; mk wt-dirty; mk here
 g repo switch -q partial; g repo commit -q --allow-empty -m more; g repo push -q origin partial; g repo reset -q --hard HEAD~1
 g repo switch -q ahead; g repo commit -q --allow-empty -m unmerged
 g repo switch -q main; g repo commit -q --allow-empty -m on-main; g repo push -q origin main; g repo reset -q --hard HEAD~1
 g repo worktree add -q "$bc/wt-clean" wt-clean; g repo worktree add -q "$bc/wt-dirty" wt-dirty; touch "$bc/wt-dirty/x"
-heads=""; for b in done ahead wt-clean wt-dirty here; do heads+="$b $(git -C "$bc/repo" rev-parse "origin/$b")"$'\n'; done
+heads=""; for b in 'done' ahead wt-clean wt-dirty here; do heads+="$b $(git -C "$bc/repo" rev-parse "origin/$b")"$'\n'; done
 heads+="partial $(git -C "$bc/repo" rev-parse origin/partial)"
 printf '#!/bin/sh\ncat <<"EOF"\n%s\nEOF\n' "$heads" > "$bc/gh"; chmod +x "$bc/gh"
-g repo push -q origin --delete done ahead; g repo switch -q here
+g repo push -q origin --delete 'done' ahead; g repo switch -q here
 CLAUDE_PROJECT_DIR="$bc/repo" HOMELAB_GH="$bc/gh" bash .claude/hooks/branch-cleanup.sh </dev/null >"$tmp/hooktest.out" 2>"$tmp/hooktest.err"; rc=$?
 has() { git -C "$bc/repo" show-ref -q --verify "refs/heads/$1"; }
 c() { # c <label> <test...>
