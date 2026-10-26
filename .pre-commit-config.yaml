@@ -1,0 +1,17 @@
+# Spike (#24): part 3's shellcheck and gitleaks entries. Every tool runs through Bazel.
+repos:
+  - repo: local
+    hooks:
+      - id: shellcheck
+        name: shellcheck
+        entry: "bazel run --config=tool @multitool//tools/shellcheck:cwd -- -S warning"
+        language: system
+        types: [shell]
+        stages: [pre-commit]
+      - id: gitleaks
+        name: gitleaks
+        entry: 'bash -c ''bazel run --config=tool @multitool//tools/gitleaks:cwd -- git -v --redact --log-opts="--diff-merges=first-parent ${PRE_COMMIT_FROM_REF:?}..${PRE_COMMIT_TO_REF:?}"'''
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-push]
