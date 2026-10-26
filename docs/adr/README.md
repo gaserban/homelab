@@ -17,7 +17,7 @@ Supersede by adding a new ADR and marking the old one Superseded; never edit a d
 | [0010](0010-operator-ui-and-observability.md) | Operator UI: Headlamp with the Flux plugin; observability deferred to VictoriaMetrics |
 | [0011](0011-backups-deferred.md) | Backups: VolSync, deferred until the base platform works |
 | [0012](0012-deletion-safety.md) | Deletion safety under Flux |
-| [0013](0013-github-access-and-merge-guard.md) | GitHub access through an App; the merge is the operator's alone |
+| [0013](0013-github-access-and-merge-guard.md) | GitHub access through an App; the merge is the operator's alone (operator clause "only to approve and merge" extended to workflow commits by 0019) |
 | [0014](0014-agent-harness.md) | The Claude Code harness: sandbox, skills, hooks, memory, flows (router bullet superseded by 0015, gate clause by 0016, runtime sentence by 0018) |
 | [0015](0015-skill-visibility-and-routing.md) | Skill visibility by the documented rule; the hl-flow router retired; two flow tiers (three passages superseded by 0016) |
 | [0016](0016-engineer-flow-and-skill-divergence.md) | The engineer flow ends at tickets; divergences from downloaded skills climb a ladder |

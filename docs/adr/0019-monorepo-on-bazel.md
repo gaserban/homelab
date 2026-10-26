@@ -62,7 +62,7 @@ provider-backed command was run.
   of Claude's checkout and of their own clone. They run prek through `bazel run` with that
   checkout's configuration; the pre-push shim loops over every pushed ref. In Claude's checkout they
   run inside Claude's sandbox, which denies Claude writes to `.git/hooks` and `.git/config`. git-guard
-  denies the direct bypasses (`--no-verify`, `SKIP`/`PREK_SKIP`, `core.hooksPath` overrides). The hooks catch
+  denies the direct bypasses (`--no-verify`, `-n` on commit, `SKIP`/`PREK_SKIP`, `core.hooksPath` overrides). The hooks catch
   Claude's mistakes, not a Claude that edits the configuration or reaches git indirectly, nor a
   push from a clone without hooks or a write through the GitHub API: before publication GitHub
   push protection is the only gate, and after it the required CI check and the operator's review.
@@ -112,9 +112,9 @@ provider-backed command was run.
 - Checks split by question. Questions about the repository as git sees it (secrets, shell lint by
   file type, Bazel file format, the hook suite) run in prek from `.pre-commit-config.yaml`, at
   commit and push through the hooks above and in CI over git's tracked files; gitleaks scans the
-  commits being pushed, or in CI the pull request's commits with a gitleaks binary the workflow
-  itself pins, always given the base branch's configuration (or the default rules) and ignore file,
-  and inline allow markers ignored. The other CI hooks
+  commits being pushed with the checkout's own configuration, or in CI the pull request's commits
+  with a gitleaks binary the workflow itself pins; only CI gives it the base branch's configuration
+  (or the default rules) and ignore file and ignores inline allow markers. The other CI hooks
   run the pull request's own configuration and tools, so the operator's review is their gate. A
   Bazel test sees the disk, not git, and replays cached results, so it cannot answer them. Questions about build targets run as `bazel test //...`, from the first
   package on. A GitHub Actions workflow runs both on `ubuntu-24.04` (amd64) and `ubuntu-24.04-arm`

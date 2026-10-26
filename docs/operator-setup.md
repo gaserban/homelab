@@ -109,12 +109,14 @@ with a working directory inside it. You work in your own clone.
    worktree. When `<C>` runs short of space or you ask, and only after you confirm no other Claude
    session is open, Claude wipes the children of `<C>`, never `<C>` itself. If `<C>/prek/patches`
    holds a file (an interrupted commit's stash), it stops and reports it instead. Otherwise, in one
-   call, then `./setup`:
+   call, then `./setup`. `go`, `zig`, `pnpm-store` and `pnpm-store-operation-locks-1000` are left
+   over from the spike (#24) and stay listed while they may exist:
 
    ```bash
    cd "$(dirname "${BAZELISK_HOME:?}")" || exit 1
-   chmod -R u+w bazel bazelisk prek xdg-cache xdg-data go zig pnpm-store pnpm-store-operation-locks-1000 2>/dev/null
-   rm -rf bazel bazelisk prek xdg-cache xdg-data go zig pnpm-store pnpm-store-operation-locks-1000
+   dirs=(bazel bazelisk prek xdg-cache xdg-data go zig pnpm-store pnpm-store-operation-locks-1000)
+   chmod -R u+w "${dirs[@]}" 2>/dev/null
+   rm -rf "${dirs[@]}"
    ```
 
 4. Once `.pre-commit-config.yaml` is on `main`, write the two hook shims, mode 755, into

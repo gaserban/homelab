@@ -14,6 +14,10 @@ holds only the Claude harness, docs and bash tools in `tools/`.
 
 ## Short answer
 
+> **Note (2026-10-26):** the operator chose Bazel instead
+> ([ADR 0019](../adr/0019-monorepo-on-bazel.md), Accepted). The "Prototype results" section below
+> shows it holding up. This answer is kept as the record of the first pass.
+
 - **No source measures what small teams run, so "established pattern" is partly my reading.** What
   the sources do show is three tiers. (1) Native workspace tools only: `pnpm -r`, `uv`, `tofu`, with
   a task runner on top. (2) A graph-and-cache layer: Turborepo, Nx, moon, and now mise's workspace
@@ -587,6 +591,10 @@ Reading the table under the rule "a candidate that fails any line gets build or 
   IaC steps that cannot be hermetic.
 
 ## Verdict: adopt go-task, build nothing now
+
+> **Note (2026-10-26):** the operator chose Bazel instead
+> ([ADR 0019](../adr/0019-monorepo-on-bazel.md), Accepted). The "Prototype results" section above
+> shows it holding up. This verdict is kept as the record of the first pass.
 
 - **Adopt go-task** as the single entry point (`task lint`, `task test`, `task plan:<root>`), one
   root `Taskfile.yml` with `includes` per language directory. It delegates to `pnpm -r` and

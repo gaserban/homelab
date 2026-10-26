@@ -5,22 +5,22 @@ set -euo pipefail
 
 # Shell builtins only until both packages are known to be present.
 missing=0
-for pkg in podman:podman bwrap:bubblewrap; do
-  command -v "${pkg%%:*}" >/dev/null || { echo "setup: ${pkg%%:*} is missing; run: sudo apt install ${pkg#*:}" >&2; missing=1; }
+for cmd_pkg in podman:podman bwrap:bubblewrap; do
+  command -v "${cmd_pkg%%:*}" >/dev/null || { echo "setup: ${cmd_pkg%%:*} is missing; run: sudo apt install ${cmd_pkg#*:}" >&2; missing=1; }
 done
 (( missing == 0 )) || exit 1
 
-# bazel on PATH must be this bazelisk release (a bump also changes .github/workflows/checks.yml).
+# bazel on PATH must be this bazelisk release (a bump also changes .github/workflows/checks.yml and docs/operator-setup.md).
 BAZELISK_VERSION=v1.30.0
 declare -A BAZELISK_SHA256=(
   [amd64]=a248ae2b2b62b5baebb748f6fba7203bff1a27e5d01b55399a8406744cb539e8
   [arm64]=b2bcc040c213b44586b121bda6d983c35df121b917c3a7a66fb16f2fa0df1a4f
 )
 arch=$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')
-want=${BAZELISK_SHA256[$arch]:-}
+pinned_sha=${BAZELISK_SHA256[$arch]:-}
 bazel=$(command -v bazel || true)
-if [[ -z "$want" || -z "$bazel" || "$(sha256sum "$(readlink -f "$bazel")" | cut -d' ' -f1)" != "$want" ]]; then
-  echo "setup: bazel on PATH is not bazelisk $BAZELISK_VERSION; install it as bazel from https://github.com/bazelbuild/bazelisk/releases/download/$BAZELISK_VERSION/bazelisk-linux-$arch (SHA-256 ${want:-none for $arch})" >&2
+if [[ -z "$pinned_sha" || -z "$bazel" || "$(sha256sum "$(readlink -f "$bazel")" | cut -d' ' -f1)" != "$pinned_sha" ]]; then
+  echo "setup: bazel on PATH is not bazelisk $BAZELISK_VERSION; install it as bazel from https://github.com/bazelbuild/bazelisk/releases/download/$BAZELISK_VERSION/bazelisk-linux-$arch (SHA-256 ${pinned_sha:-none for $arch})" >&2
   exit 1
 fi
 
