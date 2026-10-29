@@ -101,7 +101,7 @@ gets "build" or "find another".
 | Criterion | Pass when |
 | --- | --- |
 | Maintained | a release or commit within the last 12 months |
-| Licence | permissive (Apache-2.0, MIT, BSD, MPL-2.0) |
+| Licence | permissive (Apache-2.0, MIT, BSD, MPL-2.0) or copyleft (GPL-3.0, AGPL-3.0) |
 | Security | no open critical advisory; cite the audit or the OpenSSF Scorecard if one exists, otherwise mark it unverified |
 | Maintainers | more than one active maintainer |
 | Images | multi-architecture: amd64 and arm64 |
