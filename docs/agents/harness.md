@@ -104,8 +104,8 @@ gitignored; the durable record is the issue. `handoff` is not used: it is hidden
 continue.
 
 Adopt-or-build checklist, applied in stage 4: maintained within the last year,
-permissive licence, passing security audits, more than one maintainer, multi-architecture images,
-pinned by digest. Fail any, and the verdict is build or find another.
+permissive or copyleft licence (AGPL-3.0 included), passing security audits, more than one
+maintainer, multi-architecture images, pinned by digest. Fail any, and the verdict is build or find another.
 
 ## Flow model
 
